@@ -1,0 +1,200 @@
+// =============================================================================
+// SalusVet · FASE 1 · Esquema relacional
+// Stack: Next.js (App Router) + TypeScript + Prisma 7 + PostgreSQL
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// GENERATOR: le dice a Prisma QUÉ generar a partir de este archivo.
+// -----------------------------------------------------------------------------
+generator client {
+  provider = "prisma-client" // Generador moderno (Prisma 7): emite código TS dentro de tu proyecto
+  output   = "../src/generated/prisma" // Dónde se genera el cliente. Se importa desde "@/generated/prisma/client"
+}
+
+// -----------------------------------------------------------------------------
+// DATASOURCE: a QUÉ motor de base de datos nos conectamos.
+// En Prisma 7 la URL de conexión ya no vive aquí: va en prisma.config.ts
+// (que la lee de process.env.DATABASE_URL). Así el schema no conoce secretos.
+// -----------------------------------------------------------------------------
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// ENUMS
+// Se convierten en tipos ENUM nativos de PostgreSQL *y* en union types de TS.
+// La BD rechaza cualquier valor fuera de la lista (integridad) y TypeScript
+// te avisa en tiempo de compilación (tipado). Lo mejor de ambos mundos.
+// =============================================================================
+
+enum Role {
+  OWNER // Dueño de mascota (rol por defecto al registrarse)
+  VET // Veterinario: atiende citas, cambia estados
+  ADMIN // Administración de la clínica
+}
+
+enum AppointmentStatus {
+  PENDING // Solicitada por el dueño, aún no confirmada por la clínica
+  CONFIRMED // La clínica la aceptó
+  CANCELLED // Cancelada (por dueño o clínica; el "quién" vive en el historial)
+  ATTENDED // El paciente fue atendido
+  NO_SHOW // El dueño no se presentó. Agregarlo = 1 línea + 1 migración
+}
+
+enum Species {
+  DOG
+  CAT
+  BIRD
+  RABBIT
+  REPTILE
+  OTHER
+}
+
+enum Sex {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum UrgencyLevel {
+  LOW // Control de rutina
+  MEDIUM // Síntomas leves, puede esperar a la cita
+  HIGH // Conviene adelantar la atención
+  EMERGENCY // La IA recomienda ir a urgencias YA
+}
+
+// =============================================================================
+// USER · dueños, veterinarios y admins en UNA sola tabla, distinguidos por rol
+// =============================================================================
+model User {
+  id           String  @id @default(cuid()) // @id = llave primaria. cuid() genera un ID único, no adivinable
+  email        String  @unique // @unique = índice UNIQUE: no puede haber dos usuarios con el mismo email
+  passwordHash String? // "?" = columna NULLABLE. Opcional por si usas OAuth (Google) sin contraseña
+  name         String
+  phone        String?
+  role         Role    @default(OWNER) // @default = valor si no lo envías al crear. Nadie se auto-registra como VET
+
+  createdAt DateTime  @default(now()) // now() lo rellena la BD al insertar
+  updatedAt DateTime  @updatedAt // Prisma lo actualiza solo en cada update()
+  deletedAt DateTime? // Soft delete: si tiene fecha, el usuario está "borrado" pero su historial sigue
+
+  // ---- Campos de relación (NO son columnas en la BD; son "vistas" para el cliente de Prisma) ----
+  pets            Pet[]                     @relation("PetOwner") // 1:N · un dueño tiene muchas mascotas
+  vetAppointments Appointment[]             @relation("VetAppointments") // 1:N · un vet atiende muchas citas
+  statusChanges   AppointmentStatusChange[] @relation("StatusChangedBy") // 1:N · auditoría: cambios que hizo este usuario
+
+  @@index([role]) // @@ = atributo a nivel de MODELO. Acelera "dame todos los VET"
+}
+
+// =============================================================================
+// PET · paciente. Siempre pertenece a un dueño (lado "N" de User 1:N Pet)
+// =============================================================================
+model Pet {
+  id        String    @id @default(cuid())
+  name      String
+  species   Species
+  breed     String?
+  sex       Sex       @default(UNKNOWN)
+  birthDate DateTime? @db.Date // @db.Date = tipo nativo DATE de Postgres (sin hora). Edad aproximada si se desconoce
+  weightKg  Decimal?  @db.Decimal(5, 2) // Decimal, NO Float: evita errores de redondeo (999.99 kg máx.)
+  notes     String?   @db.Text // @db.Text = texto sin límite (alergias, antecedentes...)
+
+  // ---- LLAVE FORÁNEA ----
+  ownerId String // La columna FK real. Vive en el lado "muchos"
+  owner   User   @relation("PetOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  //               │                    │                  │                 └─ No se puede borrar un User con mascotas:
+  //               │                    │                  │                    protege el historial clínico (usa soft delete)
+  //               │                    │                  └─ ...apunta a User.id
+  //               │                    └─ Esta columna de Pet...
+  //               └─ Nombre de la relación. Obligatorio aquí porque User tiene VARIAS relaciones hacia otros modelos
+
+  appointments Appointment[] // 1:N · una mascota tiene muchas citas
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([ownerId]) // Postgres NO indexa las FK automáticamente. "Mascotas de este dueño" es la query más común
+}
+
+// =============================================================================
+// APPOINTMENT · la tabla intermedia N:M "con datos" entre Pet y Vet
+// =============================================================================
+model Appointment {
+  id          String            @id @default(cuid())
+  scheduledAt DateTime          @db.Timestamptz(3) // TIMESTAMP WITH TIME ZONE: guarda el instante exacto (UTC). Clave si hay usuarios en otra zona horaria
+  durationMin Int               @default(30)
+  reason      String // Motivo declarado por el dueño ("vómitos desde ayer")
+  status      AppointmentStatus @default(PENDING) // ESTADO ACTUAL (snapshot). El historial va en AppointmentStatusChange
+
+  // ---- FK a la mascota ----
+  petId String
+  pet   Pet    @relation(fields: [petId], references: [id], onDelete: Restrict)
+  //                                                       └─ No se borra una mascota con citas: son registros médicos
+
+  // ---- FK al veterinario (opcional) ----
+  vetId String? // Opcional: una cita PENDING puede no tener vet asignado aún
+  vet   User?   @relation("VetAppointments", fields: [vetId], references: [id], onDelete: SetNull)
+  //                                                                            └─ Si el vet se elimina, la cita sobrevive con vetId = NULL.
+  //                                                                               SetNull EXIGE que el campo sea opcional (String?)
+
+  preConsultation PreConsultation? // 1:0..1 · "?" en el lado SIN la FK = puede o no existir
+  statusHistory   AppointmentStatusChange[] // 1:N · la línea de tiempo de estados
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vetId, scheduledAt]) // Índice compuesto: "agenda del Dr. X esta semana" (filtra por vet, ordena por fecha)
+  @@index([petId]) // "Historial de citas de Firulais"
+  @@index([status, scheduledAt]) // "Citas PENDING de hoy" para el panel de recepción
+}
+
+// =============================================================================
+// APPOINTMENT STATUS CHANGE · auditoría (event log) de transiciones de estado
+// Responde: ¿quién canceló?, ¿cuándo pasó de PENDING a CONFIRMED?
+// Es append-only: se INSERTA una fila por cambio, nunca se edita.
+// =============================================================================
+model AppointmentStatusChange {
+  id         String             @id @default(cuid())
+  fromStatus AppointmentStatus? // Null en la primera fila (creación de la cita)
+  toStatus   AppointmentStatus
+  note       String? // "El dueño canceló por viaje"
+
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  //                                                                            └─ Sin cita, su historial no tiene sentido → se borra con ella
+
+  changedById String?
+  changedBy   User?   @relation("StatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  //                                                                                    └─ Null si lo cambió el sistema (ej. cron que marca NO_SHOW)
+
+  createdAt DateTime @default(now()) // EL "cuándo". No hay updatedAt: un evento pasado no se modifica
+
+  @@index([appointmentId, createdAt]) // Línea de tiempo de una cita, en orden
+}
+
+// =============================================================================
+// PRE-CONSULTATION · resumen estructurado que genera el chatbot de IA
+// Relación 1:1 con Appointment. La FK vive AQUÍ (lado dependiente).
+// =============================================================================
+model PreConsultation {
+  id String @id @default(cuid())
+
+  appointmentId String      @unique // @unique en la FK = lo que convierte una 1:N en 1:1. Una cita → máximo una pre-consulta
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  // ---- Columnas "promovidas": lo que necesitas FILTRAR u ORDENAR va en columnas tipadas ----
+  chiefComplaint String // Motivo principal en una frase ("Vómitos recurrentes")
+  summary        String       @db.Text // Resumen legible para el veterinario
+  symptoms       String[] // Array nativo de Postgres (text[]): ["vómito", "letargo"]
+  urgency        UrgencyLevel // Permite al vet ordenar su agenda por gravedad
+
+  // ---- El resto: payload completo de la IA ----
+  structuredData Json // JSONB en Postgres. Esquema flexible: si cambia el prompt, no necesitas migración.
+  // Valídalo con Zod al escribir y al leer: la BD no valida su forma interna
+  aiModel        String // Qué modelo lo generó (trazabilidad y depuración si un resumen sale mal)
+
+  createdAt DateTime @default(now())
+
+  @@index([urgency])
+}
