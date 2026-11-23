@@ -1,31 +1,36 @@
 import "server-only";
-import { connection } from "next/server";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { cache } from "react";
 import type { Role } from "@/generated/prisma/enums";
-import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
-export type CurrentUser = { id: string; role: Role };
+export type CurrentUser = { id: string; name: string; role: Role };
 
-// ⚠️ STUB TEMPORAL — se reemplaza en la fase de autenticación.
-// Devuelve siempre un dueño de desarrollo fijo. El resto de la app (servicios, actions)
-// solo conoce la FIRMA de esta función: cuando llegue la auth real, nada más cambia.
-const DEV_OWNER_EMAIL = "dev-owner@salusvet.local";
+// Lee la sesión del usuario que hace ESTA petición.
+// cache() de React: si en un mismo render la llaman la página, el layout y un componente,
+// la consulta a la BD se hace UNA vez. (Solo dura lo que dura la petición, no se comparte.)
+const getSession = cache(async () =>
+  // headers() incluye la cookie de sesión. Better Auth busca su token en la tabla Session:
+  // si la fila no existe o expiró, devuelve null. Por eso revocar una sesión es inmediato.
+  auth.api.getSession({ headers: await headers() }),
+);
 
+// Para páginas y acciones que EXIGEN sesión: si no hay, redirige al login.
+// Esta es la verificación REAL de seguridad (la del proxy es solo optimista).
 export async function requireUser(): Promise<CurrentUser> {
-  // Con cacheComponents, Next intenta prerenderizar en el build. connection() le dice:
-  // "esto depende de QUIÉN hace la petición, espera a que haya una". La auth real usará
-  // cookies(), que tiene el mismo efecto.
-  await connection();
+  const session = await getSession();
+  if (!session) redirect("/sign-in"); // redirect() lanza una excepción especial de Next: corta aquí
 
-  // Candado: si este stub llegara a producción, cualquiera sería "dev-owner". Mejor romper.
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("requireUser() es un stub de desarrollo: implementa la autenticación real");
-  }
+  const { id, name, role } = session.user;
+  return { id, name, role };
+}
 
-  // upsert = "créalo si no existe, si existe no toques nada". Idempotente.
-  return prisma.user.upsert({
-    where: { email: DEV_OWNER_EMAIL },
-    update: {},
-    create: { email: DEV_OWNER_EMAIL, name: "Dueño de desarrollo", role: "OWNER" },
-    select: { id: true, role: true }, // Nunca devolvemos passwordHash ni datos que no hacen falta
-  });
+// Para partes que funcionan con o sin sesión (ej. el menú del encabezado).
+export async function getOptionalUser(): Promise<CurrentUser | null> {
+  const session = await getSession();
+  if (!session) return null;
+
+  const { id, name, role } = session.user;
+  return { id, name, role };
 }
