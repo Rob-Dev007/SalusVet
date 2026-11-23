@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { requireUser } from "@/server/auth/session";
+import { requireRole } from "@/server/auth/session";
 import { listPetsByOwner } from "@/server/pets/pet.service";
 import { CreatePetForm } from "./create-pet-form";
 import { sexLabels, speciesLabels } from "./labels";
@@ -31,7 +31,7 @@ export default function PetsPage() {
 
 // Componente async de servidor: consulta la BD directamente vía el SERVICIO (nunca prisma aquí).
 async function PetList() {
-  const user = await requireUser();
+  const user = await requireRole("OWNER"); // Un VET que entre aquí va a su agenda
   const pets = await listPetsByOwner(user.id);
 
   if (pets.length === 0) {
