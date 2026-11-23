@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { homePathFor } from "@/lib/routes";
 
 // Traducimos los CÓDIGOS de error de Better Auth a mensajes nuestros.
 // Nunca mostramos error.message tal cual: no lo escribimos nosotros (ver la lección de error.tsx).
@@ -37,7 +38,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     // El cliente llama a /api/auth/*. La validación que importa ocurre en el servidor;
     // aquí solo recogemos el resultado. Fíjate: no enviamos "role". Y si lo enviáramos,
     // el servidor lo ignoraría (input: false en lib/auth.ts).
-    const { error } = isSignUp
+    const { data, error } = isSignUp
       ? await authClient.signUp.email({ email, password, name: String(form.get("name")) })
       : await authClient.signIn.email({ email, password });
 
@@ -48,7 +49,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     }
 
     // Éxito: la cookie de sesión ya está guardada (HttpOnly, el JS no puede leerla).
-    router.push("/pets");
+    // Elegir a dónde ir según el rol es solo COMODIDAD: cada página vuelve a verificarlo.
+    router.push(homePathFor(data.user.role));
     router.refresh(); // Re-renderiza los Server Components, que ahora ven la sesión
   }
 
