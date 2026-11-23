@@ -7,6 +7,7 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    seed: "tsx prisma/seed.ts", // Lo ejecuta "npx prisma db seed"
   },
   datasource: {
     // El CLI usa la conexión DIRECTA de Neon (sin pooler):
