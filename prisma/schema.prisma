@@ -7,8 +7,12 @@
 // GENERATOR: le dice a Prisma QUÉ generar a partir de este archivo.
 // -----------------------------------------------------------------------------
 generator client {
-  provider = "prisma-client" // Generador moderno (Prisma 7): emite código TS dentro de tu proyecto
-  output   = "../src/generated/prisma" // Dónde se genera el cliente. Se importa desde "@/generated/prisma/client"
+  provider        = "prisma-client" // Generador moderno (Prisma 7): emite código TS dentro de tu proyecto
+  // partialIndexes: índices con WHERE (ver Appointment). Es "preview": funciona, pero su sintaxis
+  // podría cambiar en una versión futura de Prisma. Lo preferimos a SQL a mano porque así el
+  // schema sigue siendo la única fuente de verdad (y migrate no intenta borrar el índice).
+  previewFeatures = ["partialIndexes"]
+  output          = "../src/generated/prisma" // Dónde se genera el cliente. Se importa desde "@/generated/prisma/client"
 }
 
 // -----------------------------------------------------------------------------
@@ -209,6 +213,14 @@ model Appointment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // ANTI DOBLE RESERVA. Índice ÚNICO PARCIAL: un vet no puede tener dos citas ACTIVAS a la
+  // misma hora. "Parcial" = solo cuenta las filas que cumplen el WHERE: las canceladas, atendidas
+  // o no show liberan el turno. Con turnos fijos de 30 min, misma hora de inicio = choque.
+  // Postgres lo garantiza de forma atómica, incluso con dos reservas en el mismo milisegundo.
+  // OJO: el WHERE está escrito tal como Postgres lo NORMALIZA al guardarlo ("IN (...)" se
+  // convierte en "= ANY (ARRAY[...])"). Prisma compara el texto literal: si lo escribiéramos
+  // con IN, cada migración nueva intentaría recrear el índice (drift).
+  @@unique([vetId, scheduledAt], map: "Appointment_active_vet_slot_key", where: raw("(status = ANY (ARRAY['PENDING'::\"AppointmentStatus\", 'CONFIRMED'::\"AppointmentStatus\"]))"))
   @@index([vetId, scheduledAt]) // Índice compuesto: "agenda del Dr. X esta semana" (filtra por vet, ordena por fecha)
   @@index([petId]) // "Historial de citas de Firulais"
   @@index([status, scheduledAt]) // "Citas PENDING de hoy" para el panel de recepción
