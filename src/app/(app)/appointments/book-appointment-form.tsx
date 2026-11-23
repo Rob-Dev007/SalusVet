@@ -1,0 +1,124 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import { idleState } from "@/server/shared/action-state";
+import { type BookAppointmentState, bookAppointmentAction } from "./actions";
+
+const initialState: BookAppointmentState = idleState;
+
+const inputClass =
+  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 dark:border-zinc-700 dark:bg-zinc-900";
+
+type Option = { id: string; name: string };
+
+export function BookAppointmentForm({ pets, vets }: { pets: Option[]; vets: Option[] }) {
+  const [state, formAction, pending] = useActionState(bookAppointmentAction, initialState);
+  const errors = state.status === "error" ? state.fieldErrors : undefined;
+  const values = state.status === "error" ? state.values : undefined;
+
+  // Mismo patrón que el formulario de mascotas: remontar el form con cada respuesta para que los
+  // <select> recuperen lo que eligió el usuario si hubo error.
+  const [lastState, setLastState] = useState(state);
+  const [formKey, setFormKey] = useState(0);
+  if (state !== lastState) {
+    setLastState(state);
+    setFormKey(formKey + 1);
+  }
+
+  return (
+    <form key={formKey} action={formAction} className="grid gap-4 sm:grid-cols-2" noValidate>
+      <Field label="Mascota *" htmlFor="petId" errors={errors?.petId}>
+        <select id="petId" name="petId" defaultValue={values?.petId ?? ""} className={inputClass}>
+          <option value="" disabled>
+            Selecciona…
+          </option>
+          {pets.map((pet) => (
+            <option key={pet.id} value={pet.id}>
+              {pet.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Veterinario *" htmlFor="vetId" errors={errors?.vetId}>
+        <select id="vetId" name="vetId" defaultValue={values?.vetId ?? ""} className={inputClass}>
+          <option value="" disabled>
+            Selecciona…
+          </option>
+          {vets.map((vet) => (
+            <option key={vet.id} value={vet.id}>
+              {vet.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Fecha y hora (hora de la clínica) *" htmlFor="scheduledAt" errors={errors?.scheduledAt}>
+        {/* step=1800 → el selector sugiere saltos de 30 min. Es solo ayuda: el servidor valida igual */}
+        <input
+          id="scheduledAt"
+          name="scheduledAt"
+          type="datetime-local"
+          step={1800}
+          defaultValue={values?.scheduledAt}
+          className={inputClass}
+        />
+      </Field>
+
+      <div className="sm:col-span-2">
+        <Field label="Motivo de la consulta *" htmlFor="reason" errors={errors?.reason}>
+          <textarea
+            id="reason"
+            name="reason"
+            rows={3}
+            placeholder="Ej. Vómitos desde ayer, no quiere comer"
+            defaultValue={values?.reason}
+            className={inputClass}
+          />
+        </Field>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 sm:col-span-2">
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-60"
+        >
+          {pending ? "Agendando…" : "Solicitar cita"}
+        </button>
+        <p
+          aria-live="polite"
+          className={`text-sm ${state.status === "error" ? "text-red-600" : "text-teal-700 dark:text-teal-400"}`}
+        >
+          {state.status !== "idle" && state.message}
+        </p>
+      </div>
+    </form>
+  );
+}
+
+function Field({
+  label,
+  htmlFor,
+  errors,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  errors?: string[];
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={htmlFor} className="text-sm font-medium">
+        {label}
+      </label>
+      {children}
+      {errors?.map((message) => (
+        <p key={message} className="text-xs text-red-600">
+          {message}
+        </p>
+      ))}
+    </div>
+  );
+}
