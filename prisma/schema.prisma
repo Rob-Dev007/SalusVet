@@ -67,12 +67,15 @@ enum UrgencyLevel {
 // USER · dueños, veterinarios y admins en UNA sola tabla, distinguidos por rol
 // =============================================================================
 model User {
-  id           String  @id @default(cuid()) // @id = llave primaria. cuid() genera un ID único, no adivinable
-  email        String  @unique // @unique = índice UNIQUE: no puede haber dos usuarios con el mismo email
-  passwordHash String? // "?" = columna NULLABLE. Opcional por si usas OAuth (Google) sin contraseña
-  name         String
-  phone        String?
-  role         Role    @default(OWNER) // @default = valor si no lo envías al crear. Nadie se auto-registra como VET
+  id            String  @id @default(cuid()) // @id = llave primaria. cuid() genera un ID único, no adivinable
+  email         String  @unique // @unique = índice UNIQUE: no puede haber dos usuarios con el mismo email
+  emailVerified Boolean @default(false) // Better Auth: ¿confirmó su email?
+  image         String? // Better Auth: avatar (lo rellena Google al iniciar sesión con OAuth)
+  name          String
+  phone         String?
+  role          Role    @default(OWNER) // @default = valor si no lo envías al crear. Nadie se auto-registra como VET
+  // La contraseña NO vive aquí: está en Account.password (hasheada). Un usuario puede tener
+  // varias formas de entrar (contraseña, Google...) y cada una es una fila de Account.
 
   createdAt DateTime  @default(now()) // now() lo rellena la BD al insertar
   updatedAt DateTime  @updatedAt // Prisma lo actualiza solo en cada update()
@@ -82,8 +85,70 @@ model User {
   pets            Pet[]                     @relation("PetOwner") // 1:N · un dueño tiene muchas mascotas
   vetAppointments Appointment[]             @relation("VetAppointments") // 1:N · un vet atiende muchas citas
   statusChanges   AppointmentStatusChange[] @relation("StatusChangedBy") // 1:N · auditoría: cambios que hizo este usuario
+  sessions        Session[] // 1:N · un usuario puede tener sesiones abiertas en varios dispositivos
+  accounts        Account[] // 1:N · formas de iniciar sesión (contraseña, Google...)
 
   @@index([role]) // @@ = atributo a nivel de MODELO. Acelera "dame todos los VET"
+}
+
+// =============================================================================
+// AUTENTICACIÓN · tablas que exige Better Auth (nombres y campos definidos por la librería)
+// =============================================================================
+
+// Una sesión = un dispositivo con la sesión iniciada. La cookie del navegador solo guarda
+// el TOKEN; todo lo demás vive aquí. Borrar esta fila = cerrar esa sesión al instante.
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique // Valor aleatorio que viaja en la cookie (firmada)
+  expiresAt DateTime
+  ipAddress String? //          Para mostrar "sesiones activas" y detectar accesos raros
+  userAgent String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  //                                                        └─ Sin usuario, sus sesiones no tienen sentido
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Una forma de autenticarse. providerId = "credential" (email + contraseña) o "google", etc.
+model Account {
+  id         String  @id @default(cuid())
+  providerId String // "credential", "google"...
+  accountId  String // ID del usuario EN ese proveedor (para "credential" es el propio userId)
+  password   String? // Hash de la contraseña (scrypt). Solo en cuentas "credential". NUNCA texto plano
+
+  // Tokens OAuth (solo si el proveedor es externo, como Google)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Valores temporales de un solo uso: confirmar email, restablecer contraseña...
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String //   A quién/qué pertenece (ej. el email)
+  value      String //   El código o token
+  expiresAt  DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([identifier])
 }
 
 // =============================================================================
