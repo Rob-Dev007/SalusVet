@@ -4,7 +4,8 @@ import { refresh } from "next/cache";
 import { z } from "zod";
 import { requireRole } from "@/server/auth/session";
 import { TranscriptSchema } from "@/server/pre-consultation/pre-consultation.schemas";
-import { finalizePreConsultation } from "@/server/pre-consultation/pre-consultation.service";
+import { finalizePreConsultation, submitQuestionnaire } from "@/server/pre-consultation/pre-consultation.service";
+import { QuestionnaireSchema } from "@/server/pre-consultation/questionnaire";
 import type { ActionState } from "@/server/shared/action-state";
 import { DomainError } from "@/server/shared/errors";
 
@@ -45,6 +46,45 @@ export async function finalizePreConsultationAction(
     return { status: "success", message: "Enviado al veterinario", data: undefined };
   } catch (error) {
     if (error instanceof DomainError) return { status: "error", message: error.message };
+    throw error;
+  }
+}
+
+// ---- Cuestionario guiado (modo por defecto, sin IA) ----
+export type QuestionnaireState = ActionState;
+
+export async function submitQuestionnaireAction(
+  // Atado con .bind() en el formulario. OJO: igual viaja desde el navegador y se puede manipular,
+  // como cualquier dato del cliente. No pasa nada: el servicio comprueba que la cita sea DE ESTE
+  // dueño (filtro anti-IDOR); si no, responde "no encontrada".
+  appointmentId: string,
+  _prev: QuestionnaireState,
+  formData: FormData,
+): Promise<QuestionnaireState> {
+  // Solo los campos de texto (descartamos los internos de Next, que empiezan por "$ACTION").
+  const values = Object.fromEntries(
+    [...formData.entries()].filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string" && !entry[0].startsWith("$ACTION"),
+    ),
+  );
+  try {
+    const user = await requireRole("OWNER");
+
+    const parsed = QuestionnaireSchema.safeParse(values);
+    if (!parsed.success) {
+      return {
+        status: "error",
+        message: "Faltan respuestas: revisa las preguntas marcadas",
+        fieldErrors: z.flattenError(parsed.error).fieldErrors,
+        values,
+      };
+    }
+
+    await submitQuestionnaire(user.id, appointmentId, parsed.data);
+    refresh(); // La página vuelve a renderizar y muestra el resumen (y el aviso, si es emergencia)
+    return { status: "success", message: "Enviado al veterinario", data: undefined };
+  } catch (error) {
+    if (error instanceof DomainError) return { status: "error", message: error.message, values };
     throw error;
   }
 }

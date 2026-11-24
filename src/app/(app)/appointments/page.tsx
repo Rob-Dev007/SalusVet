@@ -88,7 +88,7 @@ async function OwnerAppointmentList() {
                 href={`/appointments/${appointment.id}/pre-consultation`}
                 className="self-start rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90"
               >
-                Completar pre-consulta con IA
+                Completar pre-consulta
               </Link>
             )
           )}

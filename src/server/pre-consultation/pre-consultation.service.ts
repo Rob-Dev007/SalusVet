@@ -14,7 +14,15 @@ import {
   SUMMARY_SYSTEM_PROMPT,
 } from "./pre-consultation.prompt";
 import { type AiSummary, AiSummarySchema, type Transcript } from "./pre-consultation.schemas";
-import { detectRedFlags, resolveUrgency } from "./triage";
+import { detectAllRedFlags } from "../red-flags/red-flag.service";
+import {
+  buildQuestionnaireSummary,
+  QUESTIONNAIRE_VERSION,
+  type QuestionnaireAnswers,
+  questionnaireFreeTexts,
+  questionnaireUrgency,
+} from "./questionnaire";
+import { resolveUrgency } from "./triage";
 
 // ---------------------------------------------------------------------------------------------
 // AUTORIZACIÓN + REGLAS: ¿puede ESTE dueño hacer la pre-consulta de ESTA cita?
@@ -36,18 +44,21 @@ async function loadOwnedAppointment(ownerId: string, appointmentId: string) {
   });
   if (!appointment) throw new DomainError("NOT_FOUND", "Cita no encontrada");
 
-  // Solo tiene sentido antes de la consulta. Una cita cancelada o atendida no necesita pre-consulta
-  // (y cada llamada a la IA cuesta dinero).
+  // Solo tiene sentido antes de la consulta: una cita cancelada o atendida no la necesita.
   if (appointment.status !== "PENDING" && appointment.status !== "CONFIRMED") {
     throw new DomainError("INVALID_TRANSITION", "La pre-consulta solo está disponible para citas activas");
   }
   if (appointment.preConsultation) {
     throw new DomainError("CONFLICT", "Esta cita ya tiene una pre-consulta enviada");
   }
+  return appointment;
+}
+
+// Solo para los caminos CON IA. El cuestionario (gratis) no pasa por aquí.
+function assertAiAvailable() {
   if (!isAiConfigured()) {
     throw new DomainError("UNAVAILABLE", "El asistente no está disponible en este momento");
   }
-  return appointment;
 }
 
 // "3 años", "5 meses"... a partir de la fecha de nacimiento (si el dueño la registró).
@@ -94,10 +105,11 @@ export async function streamPreConsultationReply(
   signal: AbortSignal, // Si el dueño cierra la pestaña, cortamos la llamada y dejamos de pagar tokens
 ) {
   const appointment = await loadOwnedAppointment(ownerId, appointmentId);
+  assertAiAvailable();
 
   // TRIAJE DETERMINISTA, ANTES de llamar a la IA. Si hay alarma, nuestro código añade una
   // instrucción de operador: la IA no "decide" la emergencia, solo la comunica.
-  const redFlags = detectRedFlags(ownerTexts(transcript));
+  const redFlags = await detectAllRedFlags(ownerTexts(transcript));
   const messages: Anthropic.Beta.BetaMessageParam[] = [...transcript];
   if (redFlags.length > 0) {
     messages.push({ role: "system", content: emergencyInstruction(redFlags) });
@@ -154,6 +166,7 @@ export async function streamPreConsultationReply(
 // ---------------------------------------------------------------------------------------------
 export async function finalizePreConsultation(ownerId: string, appointmentId: string, transcript: Transcript) {
   const appointment = await loadOwnedAppointment(ownerId, appointmentId);
+  assertAiAvailable();
 
   // La conversación va como UN mensaje con etiquetas, no como turnos user/assistant: queremos que
   // el modelo la ANALICE desde fuera, no que la continúe.
@@ -182,25 +195,53 @@ export async function finalizePreConsultation(ownerId: string, appointmentId: st
   if (!ai) throw new Error(`Pre-consultation summary failed to parse (stop_reason=${response.stop_reason})`);
 
   // LA DECISIÓN FINAL: máximo entre lo que dice la IA y lo que detectan nuestras reglas.
-  const redFlags = detectRedFlags(ownerTexts(transcript));
+  const redFlags = await detectAllRedFlags(ownerTexts(transcript));
   const urgency = resolveUrgency(ai.urgency, redFlags);
 
+  return savePreConsultation({
+    appointmentId: appointment.id,
+    chiefComplaint: ai.chiefComplaint,
+    summary: ai.summary,
+    symptoms: ai.symptoms,
+    urgency,
+    // Guardamos lo que propuso la IA Y lo que decidió el código: si difieren, queda la evidencia.
+    structuredData: { source: "ai", ai, redFlags, aiUrgency: ai.urgency, transcript },
+    aiModel: response.model, // El modelo que REALMENTE respondió (podría ser el de fallback)
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// CASO DE USO 3 (por defecto, $0): el dueño envía el CUESTIONARIO guiado.
+// Mismo destino que la IA (tabla PreConsultation): la agenda del vet no distingue de dónde vino,
+// y pasar a la versión con IA no exige migrar datos ni cambiar pantallas.
+// ---------------------------------------------------------------------------------------------
+export async function submitQuestionnaire(ownerId: string, appointmentId: string, answers: QuestionnaireAnswers) {
+  const appointment = await loadOwnedAppointment(ownerId, appointmentId);
+
+  // Dos reglas deterministas, combinadas con el mismo MÁXIMO que usamos con la IA:
+  //   1. Las opciones marcadas (pesos) → urgencia "propuesta".
+  //   2. Las palabras de alarma en los textos libres (lista base + clínica).
+  const proposed = questionnaireUrgency(answers);
+  const redFlags = await detectAllRedFlags(questionnaireFreeTexts(answers));
+  const urgency = resolveUrgency(proposed, redFlags);
+
+  return savePreConsultation({
+    appointmentId: appointment.id,
+    ...buildQuestionnaireSummary(answers),
+    urgency,
+    structuredData: { source: "questionnaire", answers, redFlags, proposedUrgency: proposed },
+    // La columna se llama aiModel por la Fase 1; aquí guarda la VERSIÓN del cuestionario.
+    // Renombrarla a "source" sería una migración expand-and-contract (ver Fase 1); por ahora
+    // el valor ya distingue el origen sin tocar el schema.
+    aiModel: QUESTIONNAIRE_VERSION,
+  });
+}
+
+// Guardado común. Doble clic en "Enviar": el @unique de appointmentId rechaza la segunda.
+async function savePreConsultation(data: Prisma.PreConsultationUncheckedCreateInput) {
   try {
-    return await prisma.preConsultation.create({
-      data: {
-        appointmentId: appointment.id,
-        chiefComplaint: ai.chiefComplaint,
-        summary: ai.summary,
-        symptoms: ai.symptoms,
-        urgency,
-        // Guardamos lo que propuso la IA Y lo que decidió el código: si difieren, queda la evidencia.
-        structuredData: { ai, redFlags, aiUrgency: ai.urgency, transcript },
-        aiModel: response.model, // El modelo que REALMENTE respondió (podría ser el de fallback)
-      },
-      select: { id: true, urgency: true },
-    });
+    return await prisma.preConsultation.create({ data, select: { id: true, urgency: true } });
   } catch (error) {
-    // Doble clic en "Enviar": el @unique de appointmentId rechaza la segunda (igual que en citas).
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       throw new DomainError("CONFLICT", "Esta cita ya tiene una pre-consulta enviada");
     }

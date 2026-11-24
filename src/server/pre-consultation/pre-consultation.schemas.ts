@@ -51,13 +51,3 @@ export const AiSummarySchema = z.object({
 });
 
 export type AiSummary = z.infer<typeof AiSummarySchema>;
-
-// Lo que guardamos en la columna JSONB structuredData. Se valida al LEER también (la BD no
-// conoce la forma interna de un JSON): si mañana cambia el schema, los registros viejos no
-// rompen la página en silencio.
-export const StoredPreConsultationSchema = z.object({
-  ai: AiSummarySchema,
-  redFlags: z.array(z.string()), //  Señales que detectó NUESTRO código
-  aiUrgency: z.enum(UrgencyLevel), // Lo que propuso la IA (puede diferir del final: auditoría)
-  transcript: TranscriptSchema, //   La conversación completa, para que el vet la pueda revisar
-});

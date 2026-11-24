@@ -14,7 +14,7 @@ const appointmentSelect = {
   pet: { select: { id: true, name: true, species: true, owner: { select: { name: true } } } },
   vet: { select: { id: true, name: true } },
   // Relación 1:1 opcional: null si el dueño aún no hizo la pre-consulta.
-  preConsultation: { select: { urgency: true, chiefComplaint: true, summary: true, symptoms: true } },
+  preConsultation: { select: { urgency: true, chiefComplaint: true, summary: true, symptoms: true, aiModel: true } },
 } as const;
 
 // P2002 = Prisma tradujo una violación de UNIQUE de Postgres.

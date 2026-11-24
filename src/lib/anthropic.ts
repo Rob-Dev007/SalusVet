@@ -16,8 +16,12 @@ export const AI_FALLBACK: { betas: Anthropic.Beta.AnthropicBeta[]; fallbacks: An
   fallbacks: "default",
 };
 
-// ¿Está configurada la clave? Sin ella preferimos un mensaje claro a un error 401 críptico.
-export const isAiConfigured = () => Boolean(process.env.ANTHROPIC_API_KEY);
+// INTERRUPTOR DE LA IA (mejora de pago, apagada por defecto).
+// Sin AI_PROVIDER="claude" la pre-consulta usa el cuestionario guiado ($0). Para activarla cuando
+// la clínica lo decida: AI_PROVIDER="claude" + ANTHROPIC_API_KEY en el entorno. Cero cambios de código.
+// Pedimos las DOS cosas: tener una key cargada no debería encender la IA (y el gasto) por accidente.
+export const isAiConfigured = () =>
+  process.env.AI_PROVIDER === "claude" && Boolean(process.env.ANTHROPIC_API_KEY);
 
 // Singleton perezoso: se crea en la primera llamada, no al importar el módulo. Así el build
 // (que importa los módulos) no necesita la clave. new Anthropic() lee ANTHROPIC_API_KEY del entorno.

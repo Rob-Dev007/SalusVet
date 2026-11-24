@@ -7,7 +7,7 @@
 import { getOptionalUser } from "@/server/auth/session";
 import { ChatRequestSchema } from "@/server/pre-consultation/pre-consultation.schemas";
 import { streamPreConsultationReply } from "@/server/pre-consultation/pre-consultation.service";
-import { detectRedFlags } from "@/server/pre-consultation/triage";
+import { detectAllRedFlags } from "@/server/red-flags/red-flag.service";
 import { DomainError } from "@/server/shared/errors";
 
 const STATUS_BY_CODE: Partial<Record<DomainError["code"], number>> = {
@@ -31,12 +31,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/pre-consult
 
   const { appointmentId } = await ctx.params;
 
-  // TRIAJE ANTES QUE TODO: es una función pura (sin BD ni IA), así que no puede "caerse".
+  // TRIAJE ANTES QUE TODO, sin depender de la IA: lista base (código) + frases de la clínica (BD).
+  // Si la BD fallara, detectAllRedFlags sigue con la lista base: el triaje no puede "caerse".
   // La alarma la comunica NUESTRO código por un canal propio (un encabezado) en TODAS las
   // respuestas, también en las de error: si la IA no está disponible, el dueño igual ve el aviso.
-  const redFlagsHeader = {
-    "X-Red-Flags": String(detectRedFlags(parsed.data.messages.filter((m) => m.role === "user").map((m) => m.content)).length),
-  };
+  const ownerTexts = parsed.data.messages.filter((m) => m.role === "user").map((m) => m.content);
+  const redFlagsHeader = { "X-Red-Flags": String((await detectAllRedFlags(ownerTexts)).length) };
 
   // 3. DELEGAR.
   try {

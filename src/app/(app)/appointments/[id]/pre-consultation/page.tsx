@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { isAiConfigured } from "@/lib/anthropic";
 import { formatClinicDateTime } from "@/lib/clinic-time";
 import { requireRole } from "@/server/auth/session";
 import { getPreConsultationView } from "@/server/pre-consultation/pre-consultation.service";
 import { urgencyBadgeClass, urgencyLabels } from "../../labels";
 import { PreConsultationChat } from "./pre-consultation-chat";
+import { QuestionnaireForm } from "./questionnaire-form";
 
 export const metadata: Metadata = { title: "Pre-consulta · SalusVet" };
 
@@ -57,7 +59,7 @@ async function PreConsultationContent({ params }: { params: Promise<{ id: string
             </span>
           </div>
           <p className="mt-3 font-medium">{pre.chiefComplaint}</p>
-          <p className="mt-1 text-sm text-muted">{pre.summary}</p>
+          <p className="mt-1 whitespace-pre-line text-sm text-muted">{pre.summary}</p>
         </section>
       </>
     );
@@ -76,7 +78,12 @@ async function PreConsultationContent({ params }: { params: Promise<{ id: string
     <>
       {header}
       <div className="mt-6">
-        <PreConsultationChat appointmentId={appointment.id} petName={appointment.pet.name} />
+        {/* El servidor decide el modo: el navegador nunca ve la key ni el valor de AI_PROVIDER. */}
+        {isAiConfigured() ? (
+          <PreConsultationChat appointmentId={appointment.id} petName={appointment.pet.name} />
+        ) : (
+          <QuestionnaireForm appointmentId={appointment.id} petName={appointment.pet.name} />
+        )}
       </div>
     </>
   );
