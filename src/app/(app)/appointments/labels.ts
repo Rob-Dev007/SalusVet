@@ -1,4 +1,4 @@
-import type { AppointmentStatus } from "@/generated/prisma/enums";
+import type { AppointmentStatus, UrgencyLevel } from "@/generated/prisma/enums";
 
 export const statusLabels: Record<AppointmentStatus, string> = {
   PENDING: "Pendiente",
@@ -25,4 +25,19 @@ export const statusBadgeClass: Record<AppointmentStatus, string> = {
   CANCELLED: "bg-surface text-muted ring-1 ring-border",
   ATTENDED: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
   NO_SHOW: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200",
+};
+
+// Urgencia de la pre-consulta. EMERGENCY es la única insignia sólida: tiene que saltar a la vista.
+export const urgencyLabels: Record<UrgencyLevel, string> = {
+  LOW: "Rutina",
+  MEDIUM: "Leve",
+  HIGH: "Prioritaria",
+  EMERGENCY: "Emergencia",
+};
+
+export const urgencyBadgeClass: Record<UrgencyLevel, string> = {
+  LOW: "bg-surface text-muted ring-1 ring-border",
+  MEDIUM: "bg-accent text-accent-foreground",
+  HIGH: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
+  EMERGENCY: "bg-red-700 text-white", // Rojo sólido con texto blanco: contraste > 6:1 en ambos temas
 };

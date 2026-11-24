@@ -78,6 +78,20 @@ async function OwnerAppointmentList() {
           </div>
           <p className="text-sm text-muted">{formatClinicDateTime(appointment.scheduledAt)}</p>
           <p className="text-sm">{appointment.reason}</p>
+          {appointment.preConsultation ? (
+            <Link href={`/appointments/${appointment.id}/pre-consultation`} className="text-sm text-brand hover:underline">
+              Pre-consulta enviada ✓
+            </Link>
+          ) : (
+            (appointment.status === "PENDING" || appointment.status === "CONFIRMED") && (
+              <Link
+                href={`/appointments/${appointment.id}/pre-consultation`}
+                className="self-start rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90"
+              >
+                Completar pre-consulta con IA
+              </Link>
+            )
+          )}
           <StatusButtons appointmentId={appointment.id} status={appointment.status} actor="OWNER" />
         </li>
       ))}
