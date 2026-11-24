@@ -9,7 +9,8 @@ export type DomainErrorCode =
   | "NOT_FOUND"
   | "LIMIT_EXCEEDED"
   | "CONFLICT" //           Choca con el estado actual (horario ya tomado, la cita cambió mientras tanto)
-  | "INVALID_TRANSITION"; // La máquina de estados no permite ese cambio
+  | "INVALID_TRANSITION" // La máquina de estados no permite ese cambio
+  | "UNAVAILABLE"; //       Un servicio externo (la IA) no está disponible o declinó responder
 
 export class DomainError extends Error {
   constructor(
