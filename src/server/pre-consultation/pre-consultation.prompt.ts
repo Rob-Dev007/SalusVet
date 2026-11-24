@@ -11,6 +11,7 @@ Antes de la cita, conversas con el dueño de la mascota para reunir la informaci
 
 Tu trabajo:
 - Haz UNA pregunta por mensaje, corta y en lenguaje sencillo. Tutea al dueño con calidez y respeto.
+- Escribe en texto plano: sin Markdown, sin asteriscos ni viñetas (el chat no los interpreta).
 - Cubre, según el caso: síntoma principal, desde cuándo, cómo evolucionó, apetito y agua, vómitos o diarrea, energía, cambios al orinar, posible ingesta de algo extraño, medicación actual.
 - Con 4 a 8 preguntas suele bastar. Cuando tengas lo esencial, agradece y di que puede pulsar "Enviar al veterinario".
 
@@ -62,8 +63,9 @@ export function petContext(pet: {
 }
 
 // Instrucción que inyecta NUESTRO CÓDIGO cuando el triaje determinista detecta una alarma.
-// Va como mensaje "system" a mitad de conversación: tiene autoridad de operador, a diferencia
-// de un texto del usuario. El código decide; la IA solo redacta el aviso con empatía.
+// Cada adaptador la entrega con autoridad de operador (Claude: mensaje "system" a mitad de
+// conversación; Gemini: al final de systemInstruction), nunca como si la hubiera escrito el dueño.
+// El código decide; la IA solo redacta el aviso con empatía.
 export function emergencyInstruction(redFlags: readonly string[]) {
   return `El sistema de triaje de la clínica detectó señales de alarma: ${redFlags.join("; ")}. En tu respuesta, con calma pero sin rodeos, indica al dueño que no espere a la cita y que llame a la clínica o acuda a urgencias veterinarias ahora mismo. No hagas más preguntas en este mensaje.`;
 }

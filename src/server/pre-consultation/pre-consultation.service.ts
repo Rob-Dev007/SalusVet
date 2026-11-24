@@ -1,20 +1,16 @@
 // SERVICIO DE PRE-CONSULTA. Mismas capas que antes: aquí viven las reglas de negocio;
-// la ruta HTTP y la Server Action solo autentican, validan y delegan.
+// la ruta HTTP y las Server Actions solo autentican, validan y delegan.
+//
+// Ya no importa ningún SDK de IA: habla con la interfaz PreConsultationAI (ver ./ai/provider.ts).
+// Gemini, Claude o "sin IA" se deciden en la configuración, no aquí.
 import "server-only";
-import type Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { Prisma } from "@/generated/prisma/client";
-import { AI_FALLBACK, AI_MODEL, anthropic, isAiConfigured } from "@/lib/anthropic";
 import { prisma } from "@/lib/prisma";
-import { DomainError } from "../shared/errors";
-import {
-  CHAT_SYSTEM_PROMPT,
-  emergencyInstruction,
-  petContext,
-  SUMMARY_SYSTEM_PROMPT,
-} from "./pre-consultation.prompt";
-import { type AiSummary, AiSummarySchema, type Transcript } from "./pre-consultation.schemas";
 import { detectAllRedFlags } from "../red-flags/red-flag.service";
+import { DomainError } from "../shared/errors";
+import { AiUnavailableError, getPreConsultationAI, type PreConsultationAI } from "./ai";
+import { CHAT_SYSTEM_PROMPT, emergencyInstruction, petContext, SUMMARY_SYSTEM_PROMPT } from "./pre-consultation.prompt";
+import type { Transcript } from "./pre-consultation.schemas";
 import {
   buildQuestionnaireSummary,
   QUESTIONNAIRE_VERSION,
@@ -23,6 +19,8 @@ import {
   questionnaireUrgency,
 } from "./questionnaire";
 import { resolveUrgency } from "./triage";
+
+const AI_UNAVAILABLE_MESSAGE = "El asistente no está disponible en este momento. Puedes responder el cuestionario.";
 
 // ---------------------------------------------------------------------------------------------
 // AUTORIZACIÓN + REGLAS: ¿puede ESTE dueño hacer la pre-consulta de ESTA cita?
@@ -55,10 +53,10 @@ async function loadOwnedAppointment(ownerId: string, appointmentId: string) {
 }
 
 // Solo para los caminos CON IA. El cuestionario (gratis) no pasa por aquí.
-function assertAiAvailable() {
-  if (!isAiConfigured()) {
-    throw new DomainError("UNAVAILABLE", "El asistente no está disponible en este momento");
-  }
+function requireAi(): PreConsultationAI {
+  const ai = getPreConsultationAI();
+  if (!ai) throw new DomainError("UNAVAILABLE", AI_UNAVAILABLE_MESSAGE);
+  return ai;
 }
 
 // "3 años", "5 meses"... a partir de la fecha de nacimiento (si el dueño la registró).
@@ -71,26 +69,20 @@ function approximateAge(birthDate: Date | null, now = new Date()) {
   return `${Math.floor(months / 12)} años`;
 }
 
-// El bloque system en dos partes: [reglas fijas, CACHEADAS] + [datos de esta mascota, variables].
-// El orden importa: el caché funciona por PREFIJO; lo que cambia va después del punto de corte.
-function buildSystem(appointment: Awaited<ReturnType<typeof loadOwnedAppointment>>, rules: string) {
+// Datos de la mascota para la IA. Solo de la MASCOTA: nunca nombre, email ni teléfono del dueño
+// (minimización de datos: lo que no se envía, no se puede filtrar).
+function buildContext(appointment: Awaited<ReturnType<typeof loadOwnedAppointment>>) {
   const { pet } = appointment;
-  return [
-    { type: "text", text: rules, cache_control: { type: "ephemeral" } },
-    {
-      type: "text",
-      text: petContext({
-        name: pet.name,
-        species: pet.species,
-        breed: pet.breed,
-        sex: pet.sex,
-        ageText: approximateAge(pet.birthDate),
-        weightKg: pet.weightKg?.toString() ?? null, // Decimal → texto (no se serializa solo)
-        notes: pet.notes,
-        reason: appointment.reason,
-      }),
-    },
-  ] satisfies Anthropic.Beta.BetaTextBlockParam[];
+  return petContext({
+    name: pet.name,
+    species: pet.species,
+    breed: pet.breed,
+    sex: pet.sex,
+    ageText: approximateAge(pet.birthDate),
+    weightKg: pet.weightKg?.toString() ?? null, // Decimal → texto (no se serializa solo)
+    notes: pet.notes,
+    reason: appointment.reason,
+  });
 }
 
 const ownerTexts = (transcript: Transcript) => transcript.filter((m) => m.role === "user").map((m) => m.content);
@@ -102,59 +94,55 @@ export async function streamPreConsultationReply(
   ownerId: string,
   appointmentId: string,
   transcript: Transcript,
-  signal: AbortSignal, // Si el dueño cierra la pestaña, cortamos la llamada y dejamos de pagar tokens
+  signal: AbortSignal, // Si el dueño cierra la pestaña, cortamos la llamada
 ) {
   const appointment = await loadOwnedAppointment(ownerId, appointmentId);
-  assertAiAvailable();
+  const ai = requireAi();
 
   // TRIAJE DETERMINISTA, ANTES de llamar a la IA. Si hay alarma, nuestro código añade una
   // instrucción de operador: la IA no "decide" la emergencia, solo la comunica.
   const redFlags = await detectAllRedFlags(ownerTexts(transcript));
-  const messages: Anthropic.Beta.BetaMessageParam[] = [...transcript];
-  if (redFlags.length > 0) {
-    messages.push({ role: "system", content: emergencyInstruction(redFlags) });
+
+  const chunks = ai.streamReply({
+    rules: CHAT_SYSTEM_PROMPT,
+    context: buildContext(appointment),
+    transcript,
+    operatorNote: redFlags.length > 0 ? emergencyInstruction(redFlags) : null,
+    signal,
+  });
+
+  // Pedimos el PRIMER trozo antes de responder. ¿Por qué? Una vez enviados los encabezados HTTP
+  // (status 200) ya no podemos decir "503". Si el proveedor está caído o sin cuota, casi siempre
+  // falla aquí, al inicio: así respondemos un error limpio y el navegador ofrece el cuestionario.
+  let first: IteratorResult<string>;
+  try {
+    first = await chunks.next();
+  } catch (error) {
+    if (error instanceof AiUnavailableError) {
+      console.error("[pre-consultation] AI unavailable", error.message);
+      throw new DomainError("UNAVAILABLE", AI_UNAVAILABLE_MESSAGE);
+    }
+    throw error;
   }
 
-  const aiStream = anthropic().beta.messages.stream(
-    {
-      model: AI_MODEL,
-      max_tokens: 8000, // Incluye el razonamiento interno del modelo, no solo el texto visible
-      output_config: { effort: "low" }, // Una pregunta corta no necesita razonamiento profundo: más rápido y barato
-      system: buildSystem(appointment, CHAT_SYSTEM_PROMPT),
-      messages,
-      ...AI_FALLBACK,
-    },
-    { signal },
-  );
-
   const encoder = new TextEncoder();
-  // Convertimos los eventos del SDK en un stream de TEXTO plano para el navegador.
-  // El cliente no necesita saber nada de la API de Claude: solo recibe palabras.
+  // Convertimos los trozos en un stream de TEXTO plano para el navegador.
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const event of aiStream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            controller.enqueue(encoder.encode(event.delta.text));
-          }
-        }
-        const final = await aiStream.finalMessage();
-        // Siempre revisar stop_reason: si el modelo (y su fallback) declinaron, no dejamos al
-        // dueño frente a una burbuja vacía.
-        if (final.stop_reason === "refusal") {
-          controller.enqueue(encoder.encode("No puedo ayudarte con eso. Cuéntame cómo está tu mascota."));
-        }
+        if (!first.done) controller.enqueue(encoder.encode(first.value));
+        for await (const text of chunks) controller.enqueue(encoder.encode(text));
         controller.close();
       } catch (error) {
-        // Los encabezados HTTP ya se enviaron: no podemos cambiar el status a 500. Registramos el
-        // error real en el servidor y le damos al dueño un mensaje genérico (sin detalles internos).
+        // Falló a MITAD de la respuesta: los encabezados ya salieron, no podemos cambiar el
+        // status. Registramos el error real y damos al dueño un mensaje genérico.
         console.error("[pre-consultation] stream failed", error);
         controller.enqueue(encoder.encode("\n\n⚠️ Se interrumpió la respuesta. Intenta de nuevo."));
         controller.close();
       }
     },
-    cancel() {
-      aiStream.abort(); // El navegador cerró la conexión
+    async cancel() {
+      await chunks.return(undefined); // El navegador cerró la conexión: cerramos el generador
     },
   });
 
@@ -162,58 +150,48 @@ export async function streamPreConsultationReply(
 }
 
 // ---------------------------------------------------------------------------------------------
-// CASO DE USO 2: el dueño termina → resumen ESTRUCTURADO, triaje final y guardado.
+// CASO DE USO 2: el dueño termina el chat → resumen ESTRUCTURADO, triaje final y guardado.
 // ---------------------------------------------------------------------------------------------
 export async function finalizePreConsultation(ownerId: string, appointmentId: string, transcript: Transcript) {
   const appointment = await loadOwnedAppointment(ownerId, appointmentId);
-  assertAiAvailable();
+  const ai = requireAi();
 
-  // La conversación va como UN mensaje con etiquetas, no como turnos user/assistant: queremos que
-  // el modelo la ANALICE desde fuera, no que la continúe.
+  // La conversación va como UN texto con etiquetas, no como turnos: queremos que el modelo la
+  // ANALICE desde fuera, no que la continúe.
   const conversation = transcript
     .map((m) => `${m.role === "user" ? "Dueño" : "Asistente"}: ${m.content}`)
     .join("\n\n");
 
-  const response = await anthropic().beta.messages.parse({
-    model: AI_MODEL,
-    max_tokens: 16000,
-    output_config: {
-      effort: "medium", // Resumir y clasificar urgencia sí merece algo más de razonamiento
-      format: betaZodOutputFormat(AiSummarySchema), // Structured outputs: JSON que DEBE cumplir el schema
-    },
-    system: buildSystem(appointment, SUMMARY_SYSTEM_PROMPT),
-    messages: [{ role: "user", content: `<conversacion>\n${conversation}\n</conversacion>` }],
-    ...AI_FALLBACK,
-  });
-
-  if (response.stop_reason === "refusal") {
-    throw new DomainError("UNAVAILABLE", "No pudimos generar el resumen. Tu cita sigue en pie.");
+  let summary;
+  try {
+    summary = await ai.summarize({ rules: SUMMARY_SYSTEM_PROMPT, context: buildContext(appointment), conversation });
+  } catch (error) {
+    if (error instanceof AiUnavailableError) {
+      console.error("[pre-consultation] summary unavailable", error.message);
+      throw new DomainError("UNAVAILABLE", "No pudimos generar el resumen ahora. Puedes responder el cuestionario.");
+    }
+    throw error;
   }
-  const ai: AiSummary | null = response.parsed_output;
-  // null = el JSON no pasó la validación de Zod. Es un fallo técnico, no del usuario: lo dejamos
-  // propagar (Next lo enmascara con un digest).
-  if (!ai) throw new Error(`Pre-consultation summary failed to parse (stop_reason=${response.stop_reason})`);
 
   // LA DECISIÓN FINAL: máximo entre lo que dice la IA y lo que detectan nuestras reglas.
   const redFlags = await detectAllRedFlags(ownerTexts(transcript));
-  const urgency = resolveUrgency(ai.urgency, redFlags);
+  const urgency = resolveUrgency(summary.urgency, redFlags);
 
   return savePreConsultation({
     appointmentId: appointment.id,
-    chiefComplaint: ai.chiefComplaint,
-    summary: ai.summary,
-    symptoms: ai.symptoms,
+    chiefComplaint: summary.chiefComplaint,
+    summary: summary.summary,
+    symptoms: summary.symptoms,
     urgency,
     // Guardamos lo que propuso la IA Y lo que decidió el código: si difieren, queda la evidencia.
-    structuredData: { source: "ai", ai, redFlags, aiUrgency: ai.urgency, transcript },
-    aiModel: response.model, // El modelo que REALMENTE respondió (podría ser el de fallback)
+    structuredData: { source: "ai", ai: summary, redFlags, aiUrgency: summary.urgency, transcript },
+    aiModel: ai.model, // Qué proveedor y modelo generó el resumen (trazabilidad)
   });
 }
 
 // ---------------------------------------------------------------------------------------------
-// CASO DE USO 3 (por defecto, $0): el dueño envía el CUESTIONARIO guiado.
-// Mismo destino que la IA (tabla PreConsultation): la agenda del vet no distingue de dónde vino,
-// y pasar a la versión con IA no exige migrar datos ni cambiar pantallas.
+// CASO DE USO 3 ($0, y RESPALDO si la IA falla): el dueño envía el CUESTIONARIO guiado.
+// Mismo destino que la IA (tabla PreConsultation): la agenda del vet no distingue de dónde vino.
 // ---------------------------------------------------------------------------------------------
 export async function submitQuestionnaire(ownerId: string, appointmentId: string, answers: QuestionnaireAnswers) {
   const appointment = await loadOwnedAppointment(ownerId, appointmentId);
