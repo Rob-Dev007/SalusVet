@@ -86,13 +86,15 @@ model User {
   deletedAt DateTime? // Soft delete: si tiene fecha, el usuario está "borrado" pero su historial sigue
 
   // ---- Campos de relación (NO son columnas en la BD; son "vistas" para el cliente de Prisma) ----
-  pets                Pet[]                     @relation("PetOwner") // 1:N · un dueño tiene muchas mascotas
-  vetAppointments     Appointment[]             @relation("VetAppointments") // 1:N · un vet atiende muchas citas
-  statusChanges       AppointmentStatusChange[] @relation("StatusChangedBy") // 1:N · auditoría: cambios que hizo este usuario
-  sessions            Session[] // 1:N · un usuario puede tener sesiones abiertas en varios dispositivos
-  accounts            Account[] // 1:N · formas de iniciar sesión (contraseña, Google...)
-  redFlagsCreated     RedFlagKeyword[]          @relation("RedFlagCreatedBy") //     Auditoría: alertas que añadió este vet
-  redFlagsDeactivated RedFlagKeyword[]          @relation("RedFlagDeactivatedBy") // Auditoría: alertas que desactivó
+  pets                          Pet[]                     @relation("PetOwner") // 1:N · un dueño tiene muchas mascotas
+  vetAppointments               Appointment[]             @relation("VetAppointments") // 1:N · un vet atiende muchas citas
+  statusChanges                 AppointmentStatusChange[] @relation("StatusChangedBy") // 1:N · auditoría: cambios que hizo este usuario
+  sessions                      Session[] // 1:N · un usuario puede tener sesiones abiertas en varios dispositivos
+  accounts                      Account[] // 1:N · formas de iniciar sesión (contraseña, Google...)
+  redFlagsCreated               RedFlagKeyword[]          @relation("RedFlagCreatedBy") //     Auditoría: alertas que añadió este vet
+  redFlagsDeactivated           RedFlagKeyword[]          @relation("RedFlagDeactivatedBy") // Auditoría: alertas que desactivó
+  redFlagsDeactivationRequested RedFlagKeyword[]          @relation("RedFlagDeactivationRequestedBy") // Bajas que solicitó
+  redFlagsLocked                RedFlagKeyword[]          @relation("RedFlagLockedBy") //      Alertas que protegió (ADMIN)
 
   @@index([role]) // @@ = atributo a nivel de MODELO. Acelera "dame todos los VET"
 }
@@ -298,6 +300,23 @@ model RedFlagKeyword {
   deactivatedById String?
   deactivatedBy   User?     @relation("RedFlagDeactivatedBy", fields: [deactivatedById], references: [id], onDelete: SetNull)
   deactivatedAt   DateTime?
+
+  // CUATRO OJOS: la baja tiene DOS pasos y DOS personas distintas.
+  //   1) Alguien la SOLICITA con un motivo → la alerta SIGUE ACTIVA (falla segura).
+  //   2) OTRA persona la APRUEBA → recién ahí active=false; deactivatedBy = quien aprobó.
+  // Los campos de la solicitud se conservan después de aprobar: queda quién pidió, por qué y quién aprobó.
+  deactivationRequestedById String?
+  deactivationRequestedBy   User?     @relation("RedFlagDeactivationRequestedBy", fields: [deactivationRequestedById], references: [id], onDelete: SetNull)
+  deactivationRequestedAt   DateTime?
+  deactivationReason        String?
+
+  // PROTEGIDA: un ADMIN la marca como intocable. Desde la interfaz NO hay forma de desprotegerla
+  // (ni de solicitar su baja): solo con un cambio de código o de BD revisado. Invariante en la BD:
+  // locked ⇒ active (CHECK en la migración; Prisma no modela CHECKs, por eso vive en el SQL).
+  locked     Boolean   @default(false)
+  lockedById String?
+  lockedBy   User?     @relation("RedFlagLockedBy", fields: [lockedById], references: [id], onDelete: SetNull)
+  lockedAt   DateTime?
 
   @@index([active]) // El triaje lee "todas las activas" en cada mensaje del chat
 }
