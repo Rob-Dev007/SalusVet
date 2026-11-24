@@ -4,7 +4,13 @@ import { formatClinicDateTime } from "@/lib/clinic-time";
 import { requireRole } from "@/server/auth/session";
 import { BASE_RED_FLAG_LABELS } from "@/server/pre-consultation/triage";
 import { listRedFlagsForManagement } from "@/server/red-flags/red-flag.service";
-import { AddRedFlagForm, DeactivateButton } from "./red-flag-forms";
+import {
+  AddRedFlagForm,
+  ApproveDeactivationButton,
+  CancelDeactivationButton,
+  LockButton,
+  RequestDeactivationForm,
+} from "./red-flag-forms";
 
 export const metadata: Metadata = { title: "Alertas de triaje · SalusVet" };
 
@@ -25,7 +31,7 @@ export default function RedFlagsPage() {
 }
 
 async function RedFlagsContent() {
-  await requireRole("VET", "ADMIN");
+  const user = await requireRole("VET", "ADMIN");
   const clinicFlags = await listRedFlagsForManagement();
 
   return (
@@ -41,27 +47,64 @@ async function RedFlagsContent() {
           <p className="text-sm text-muted">Todavía no añadieron alertas propias.</p>
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border">
-            {clinicFlags.map((flag) => (
-              <li key={flag.id} className={`flex flex-wrap items-start justify-between gap-3 px-4 py-3 ${flag.active ? "" : "opacity-60"}`}>
-                <div className="min-w-0">
-                  <p className="font-medium">
-                    “{flag.phrase}” <span className="font-normal text-muted">→ {flag.label}</span>
-                  </p>
-                  {/* Auditoría visible: quién la añadió y, si aplica, quién la desactivó. */}
-                  <p className="text-xs text-muted">
-                    Añadida por {flag.createdBy?.name ?? "usuario eliminado"} · {formatClinicDateTime(flag.createdAt)}
-                    {!flag.active &&
-                      flag.deactivatedAt &&
-                      ` · Desactivada por ${flag.deactivatedBy?.name ?? "usuario eliminado"} · ${formatClinicDateTime(flag.deactivatedAt)}`}
-                  </p>
-                </div>
-                {flag.active ? (
-                  <DeactivateButton id={flag.id} phrase={flag.phrase} />
-                ) : (
-                  <span className="text-xs text-muted">Inactiva</span>
-                )}
-              </li>
-            ))}
+            {clinicFlags.map((flag) => {
+              const pending = flag.active && flag.deactivationRequestedAt !== null;
+              const mine = flag.deactivationRequestedById === user.id;
+              return (
+                <li key={flag.id} className={`flex flex-col gap-2 px-4 py-3 ${flag.active ? "" : "opacity-60"}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium">
+                        “{flag.phrase}” <span className="font-normal text-muted">→ {flag.label}</span>
+                        {flag.locked && (
+                          <span className="ml-2 rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground">
+                            🔒 Protegida
+                          </span>
+                        )}
+                      </p>
+                      {/* Auditoría visible: quién la añadió, quién la protegió y quién pidió y aprobó la baja. */}
+                      <p className="text-xs text-muted">
+                        Añadida por {who(flag.createdBy)} · {formatClinicDateTime(flag.createdAt)}
+                        {flag.locked && flag.lockedAt && ` · Protegida por ${who(flag.lockedBy)} · ${formatClinicDateTime(flag.lockedAt)}`}
+                      </p>
+                      {!flag.active && flag.deactivatedAt && (
+                        <p className="text-xs text-muted">
+                          {flag.deactivationRequestedAt &&
+                            `Baja pedida por ${who(flag.deactivationRequestedBy)} («${flag.deactivationReason}») · `}
+                          {flag.deactivationRequestedAt ? "aprobada" : "Desactivada"} por {who(flag.deactivatedBy)} ·{" "}
+                          {formatClinicDateTime(flag.deactivatedAt)}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Qué puede hacer ESTE usuario. Es solo comodidad: cada regla se vuelve a aplicar en el servidor. */}
+                    {!flag.active ? (
+                      <span className="text-xs text-muted">Inactiva</span>
+                    ) : flag.locked ? null : pending ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {!mine && <ApproveDeactivationButton id={flag.id} phrase={flag.phrase} />}
+                        <CancelDeactivationButton id={flag.id} mine={mine} />
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-start gap-3">
+                        <RequestDeactivationForm id={flag.id} />
+                        {user.role === "ADMIN" && <LockButton id={flag.id} phrase={flag.phrase} />}
+                      </div>
+                    )}
+                  </div>
+
+                  {pending && flag.deactivationRequestedAt && (
+                    <p className="rounded-lg bg-accent px-3 py-2 text-xs text-accent-foreground">
+                      <span className="font-medium">Baja pendiente</span> · pedida por {who(flag.deactivationRequestedBy)} ·{" "}
+                      {formatClinicDateTime(flag.deactivationRequestedAt)}: «{flag.deactivationReason}».{" "}
+                      {mine
+                        ? "Otra persona del equipo debe aprobarla. Mientras tanto, la alerta sigue activa."
+                        : "Sigue activa hasta que la apruebes o la rechaces."}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -81,4 +124,9 @@ async function RedFlagsContent() {
       </section>
     </>
   );
+}
+
+// Los usuarios eliminados dejan la referencia en NULL (onDelete: SetNull): la auditoría lo dice.
+function who(user: { name: string } | null) {
+  return user?.name ?? "usuario eliminado";
 }

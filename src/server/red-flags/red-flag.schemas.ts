@@ -24,4 +24,14 @@ export const AddRedFlagSchema = z.object({
 
 export type AddRedFlagInput = z.infer<typeof AddRedFlagSchema>;
 
-export const DeactivateRedFlagSchema = z.object({ id: z.string().min(1) });
+// Aprobar, rechazar o proteger: solo hace falta saber CUÁL alerta.
+export const RedFlagIdSchema = z.object({ id: z.string().min(1) });
+
+// Solicitar la baja exige un MOTIVO: quien aprueba decide con contexto, y queda en la auditoría.
+export const RequestDeactivationSchema = RedFlagIdSchema.extend({
+  reason: z
+    .string()
+    .trim()
+    .min(10, { error: "Explica el motivo (mínimo 10 caracteres)" })
+    .max(300, { error: "Máximo 300 caracteres" }),
+});

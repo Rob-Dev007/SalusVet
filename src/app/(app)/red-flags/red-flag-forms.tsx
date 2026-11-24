@@ -2,7 +2,14 @@
 
 import { useActionState, useState } from "react";
 import { idleState } from "@/server/shared/action-state";
-import { addRedFlagAction, deactivateRedFlagAction, type RedFlagState } from "./actions";
+import {
+  addRedFlagAction,
+  approveDeactivationAction,
+  cancelDeactivationAction,
+  lockRedFlagAction,
+  type RedFlagState,
+  requestDeactivationAction,
+} from "./actions";
 
 const initialState: RedFlagState = idleState;
 
@@ -65,16 +72,67 @@ export function AddRedFlagForm() {
   );
 }
 
-export function DeactivateButton({ id, phrase }: { id: string; phrase: string }) {
-  const [state, formAction, pending] = useActionState(deactivateRedFlagAction, initialState);
+const smallButton = "rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-surface disabled:opacity-60";
+
+// PASO 1 de la baja: pedirla con un motivo. <details> lo mantiene plegado hasta que hace falta,
+// sin JavaScript extra.
+export function RequestDeactivationForm({ id }: { id: string }) {
+  const [state, formAction, pending] = useActionState(requestDeactivationAction, initialState);
+  const values = state.status === "error" ? state.values : undefined;
+  const reasonErrors = state.status === "error" ? state.fieldErrors?.reason : undefined;
+  return (
+    <details className="w-full text-sm sm:w-auto">
+      <summary className="cursor-pointer text-xs font-medium text-muted hover:text-foreground">Solicitar baja</summary>
+      <form action={formAction} className="mt-2 flex flex-col gap-2 sm:w-72" noValidate>
+        <input type="hidden" name="id" value={id} />
+        <label htmlFor={`reason-${id}`} className="text-xs font-medium">
+          Motivo (lo verá quien apruebe)
+        </label>
+        <textarea
+          id={`reason-${id}`}
+          name="reason"
+          rows={2}
+          maxLength={300}
+          defaultValue={values?.reason}
+          placeholder="Ej.: da falsos positivos con «paracetamol infantil recetado»"
+          className={inputClass}
+        />
+        {reasonErrors?.map((message) => (
+          <p key={message} className="text-xs text-danger">
+            {message}
+          </p>
+        ))}
+        <p className="text-xs text-muted">La alerta seguirá activa hasta que otra persona del equipo apruebe.</p>
+        <button type="submit" disabled={pending} className={`${smallButton} self-start`}>
+          {pending ? "Enviando…" : "Enviar solicitud"}
+        </button>
+        {state.status === "error" && !reasonErrors && <p className="text-xs text-danger">{state.message}</p>}
+      </form>
+    </details>
+  );
+}
+
+// Botón de un clic para las acciones que solo necesitan el id. `confirmText` pide confirmación
+// para las que tienen consecuencias (aprobar una baja, proteger).
+function FlagActionButton({
+  id,
+  action,
+  label,
+  confirmText,
+  primary = false,
+}: {
+  id: string;
+  action: (prev: RedFlagState, formData: FormData) => Promise<RedFlagState>;
+  label: string;
+  confirmText?: string;
+  primary?: boolean;
+}) {
+  const [state, formAction, pending] = useActionState(action, initialState);
   return (
     <form
       action={formAction}
       onSubmit={(event) => {
-        // Confirmación: desactivar una alerta hace el triaje menos estricto.
-        if (!window.confirm(`¿Desactivar la alerta "${phrase}"? Quedará registrado quién lo hizo.`)) {
-          event.preventDefault();
-        }
+        if (confirmText && !window.confirm(confirmText)) event.preventDefault();
       }}
       className="flex items-center gap-2"
     >
@@ -82,11 +140,40 @@ export function DeactivateButton({ id, phrase }: { id: string; phrase: string })
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-surface disabled:opacity-60"
+        className={primary ? "rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60" : smallButton}
       >
-        {pending ? "…" : "Desactivar"}
+        {pending ? "…" : label}
       </button>
       {state.status === "error" && <span className="text-xs text-danger">{state.message}</span>}
     </form>
+  );
+}
+
+// PASO 2: otra persona aprueba. (Si quien pidió la baja intentara aprobar, el servidor lo rechaza;
+// la UI ni siquiera le muestra el botón, pero la UI NO es la que protege.)
+export function ApproveDeactivationButton({ id, phrase }: { id: string; phrase: string }) {
+  return (
+    <FlagActionButton
+      id={id}
+      action={approveDeactivationAction}
+      label="Aprobar baja"
+      primary
+      confirmText={`¿Aprobar la baja de "${phrase}"? Desde ahora el triaje dejará de detectarla. Quedará registrado.`}
+    />
+  );
+}
+
+export function CancelDeactivationButton({ id, mine }: { id: string; mine: boolean }) {
+  return <FlagActionButton id={id} action={cancelDeactivationAction} label={mine ? "Retirar solicitud" : "Rechazar"} />;
+}
+
+export function LockButton({ id, phrase }: { id: string; phrase: string }) {
+  return (
+    <FlagActionButton
+      id={id}
+      action={lockRedFlagAction}
+      label="🔒 Proteger"
+      confirmText={`¿Proteger "${phrase}"? Nadie podrá desactivarla desde la aplicación, tampoco tú. Solo se revierte con un cambio técnico.`}
+    />
   );
 }
