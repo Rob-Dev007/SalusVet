@@ -11,11 +11,11 @@ export default function GlobalError({ retry }: { error: unknown; retry: () => vo
       <body className="flex min-h-full flex-col items-center justify-center gap-4 px-4 py-16 text-center">
         <title>Error · SalusVet</title>
         <h1 className="text-xl font-semibold">SalusVet no está disponible en este momento</h1>
-        <p className="text-sm text-zinc-500">Estamos trabajando para solucionarlo.</p>
+        <p className="text-sm text-muted">Estamos trabajando para solucionarlo.</p>
         <button
           type="button"
           onClick={retry}
-          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
         >
           Reintentar
         </button>

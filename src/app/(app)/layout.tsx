@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Wordmark } from "@/components/wordmark";
 import { homePathFor } from "@/lib/routes";
 import { getOptionalUser } from "@/server/auth/session";
 import { SignOutButton } from "./sign-out-button";
@@ -20,9 +22,9 @@ const navByRole = {
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <>
-      <header className="border-b border-zinc-200 dark:border-zinc-800">
+      <header className="border-b border-border">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-3">
-          <Suspense fallback={<span className="font-semibold text-teal-700 dark:text-teal-400">SalusVet</span>}>
+          <Suspense fallback={<Wordmark />}>
             <UserNav />
           </Suspense>
         </div>
@@ -38,22 +40,23 @@ async function UserNav() {
   return (
     <>
       <nav className="flex items-center gap-4">
-        <Link href={user ? homePathFor(user.role) : "/"} className="font-semibold text-teal-700 dark:text-teal-400">
-          SalusVet
-        </Link>
+        <Wordmark href={user ? homePathFor(user.role) : "/"} />
         {user?.role &&
           navByRole[user.role].map((item) => (
-            <Link key={item.href} href={item.href} className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">
+            <Link key={item.href} href={item.href} className="text-sm text-muted hover:text-foreground">
               {item.label}
             </Link>
           ))}
       </nav>
-      {user && (
-        <div className="flex items-center gap-4">
-          <span className="hidden text-sm text-zinc-500 sm:inline">{user.name}</span>
-          <SignOutButton />
-        </div>
-      )}
+      <div className="flex items-center gap-4">
+        <ThemeToggle />
+        {user && (
+          <>
+            <span className="hidden text-sm text-muted sm:inline">{user.name}</span>
+            <SignOutButton />
+          </>
+        )}
+      </div>
     </>
   );
 }

@@ -27,7 +27,7 @@ export default function ErrorBoundary({
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 px-4 py-16 text-center">
       <h1 className="text-xl font-semibold">Algo salió mal</h1>
-      <p className="text-sm text-zinc-500">
+      <p className="text-sm text-muted">
         Tuvimos un problema al cargar esta sección. No es culpa tuya: puedes intentarlo de nuevo en
         unos segundos.
       </p>
@@ -35,13 +35,13 @@ export default function ErrorBoundary({
       <button
         type="button"
         onClick={retry}
-        className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
       >
         Reintentar
       </button>
 
       {digest && (
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-muted">
           Si el problema continúa, comparte este código con soporte:{" "}
           <code className="font-mono">{digest}</code>
         </p>

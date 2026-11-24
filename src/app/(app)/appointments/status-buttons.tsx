@@ -37,15 +37,15 @@ export function StatusButtons({
           disabled={pending}
           className={
             to === "CANCELLED" || to === "NO_SHOW"
-              ? "rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800"
-              : "rounded-md bg-teal-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-teal-800 disabled:opacity-60"
+              ? "rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-surface disabled:opacity-60"
+              : "rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
           }
         >
           {transitionLabels[to]}
         </button>
       ))}
       {state.status === "error" && (
-        <p aria-live="polite" className="text-xs text-red-600">
+        <p aria-live="polite" className="text-xs text-danger">
           {state.message}
         </p>
       )}

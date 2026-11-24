@@ -12,16 +12,16 @@ export const metadata: Metadata = { title: "Mis mascotas · SalusVet" };
 export default function PetsPage() {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">Mis mascotas</h1>
+      <h1 className="font-display text-3xl text-brand">Mis mascotas</h1>
 
-      <section className="mt-6 rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
+      <section className="mt-6 rounded-xl border border-border p-5">
         <h2 className="mb-4 text-lg font-medium">Registrar una mascota</h2>
         <CreatePetForm />
       </section>
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-medium">Registradas</h2>
-        <Suspense fallback={<p className="text-sm text-zinc-500">Cargando mascotas…</p>}>
+        <Suspense fallback={<p className="text-sm text-muted">Cargando mascotas…</p>}>
           <PetList />
         </Suspense>
       </section>
@@ -35,21 +35,21 @@ async function PetList() {
   const pets = await listPetsByOwner(user.id);
 
   if (pets.length === 0) {
-    return <p className="text-sm text-zinc-500">Aún no registraste mascotas.</p>;
+    return <p className="text-sm text-muted">Aún no registraste mascotas.</p>;
   }
 
   return (
-    <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+    <ul className="divide-y divide-border rounded-xl border border-border">
       {pets.map((pet) => (
         <li key={pet.id} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
           <div>
             <p className="font-medium">{pet.name}</p>
-            <p className="text-sm text-zinc-500">
+            <p className="text-sm text-muted">
               {speciesLabels[pet.species]}
               {pet.breed && ` · ${pet.breed}`} · {sexLabels[pet.sex]}
             </p>
           </div>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted">
             {/* weightKg es Prisma.Decimal (no number): lo convertimos a texto para mostrarlo */}
             {pet.weightKg && `${pet.weightKg.toString()} kg`}
             {pet.birthDate && ` · nació ${pet.birthDate.toLocaleDateString("es", { timeZone: "UTC" })}`}

@@ -7,7 +7,7 @@ import { type BookAppointmentState, bookAppointmentAction } from "./actions";
 const initialState: BookAppointmentState = idleState;
 
 const inputClass =
-  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 dark:border-zinc-700 dark:bg-zinc-900";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
 
 type Option = { id: string; name: string };
 
@@ -82,13 +82,13 @@ export function BookAppointmentForm({ pets, vets }: { pets: Option[]; vets: Opti
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-60"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
         >
           {pending ? "Agendando…" : "Solicitar cita"}
         </button>
         <p
           aria-live="polite"
-          className={`text-sm ${state.status === "error" ? "text-red-600" : "text-teal-700 dark:text-teal-400"}`}
+          className={`text-sm ${state.status === "error" ? "text-danger" : "text-brand"}`}
         >
           {state.status !== "idle" && state.message}
         </p>
@@ -115,7 +115,7 @@ function Field({
       </label>
       {children}
       {errors?.map((message) => (
-        <p key={message} className="text-xs text-red-600">
+        <p key={message} className="text-xs text-danger">
           {message}
         </p>
       ))}

@@ -14,18 +14,18 @@ export const metadata: Metadata = { title: "Mis citas · SalusVet" };
 export default function AppointmentsPage() {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-semibold">Mis citas</h1>
+      <h1 className="font-display text-3xl text-brand">Mis citas</h1>
 
-      <section className="mt-6 rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
+      <section className="mt-6 rounded-xl border border-border p-5">
         <h2 className="mb-4 text-lg font-medium">Agendar una cita</h2>
-        <Suspense fallback={<p className="text-sm text-zinc-500">Cargando…</p>}>
+        <Suspense fallback={<p className="text-sm text-muted">Cargando…</p>}>
           <BookingSection />
         </Suspense>
       </section>
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-medium">Historial</h2>
-        <Suspense fallback={<p className="text-sm text-zinc-500">Cargando citas…</p>}>
+        <Suspense fallback={<p className="text-sm text-muted">Cargando citas…</p>}>
           <OwnerAppointmentList />
         </Suspense>
       </section>
@@ -40,9 +40,9 @@ async function BookingSection() {
 
   if (pets.length === 0) {
     return (
-      <p className="text-sm text-zinc-500">
+      <p className="text-sm text-muted">
         Primero{" "}
-        <Link href="/pets" className="font-medium text-teal-700 hover:underline dark:text-teal-400">
+        <Link href="/pets" className="font-medium text-brand hover:underline">
           registra una mascota
         </Link>
         .
@@ -60,23 +60,23 @@ async function OwnerAppointmentList() {
   const appointments = await listAppointmentsForOwner(user.id);
 
   if (appointments.length === 0) {
-    return <p className="text-sm text-zinc-500">Todavía no agendaste citas.</p>;
+    return <p className="text-sm text-muted">Todavía no agendaste citas.</p>;
   }
 
   return (
-    <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+    <ul className="divide-y divide-border rounded-xl border border-border">
       {appointments.map((appointment) => (
         <li key={appointment.id} className="flex flex-col gap-2 px-4 py-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="font-medium">
               {appointment.pet.name}
-              <span className="font-normal text-zinc-500"> · {appointment.vet?.name ?? "Sin asignar"}</span>
+              <span className="font-normal text-muted"> · {appointment.vet?.name ?? "Sin asignar"}</span>
             </p>
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass[appointment.status]}`}>
               {statusLabels[appointment.status]}
             </span>
           </div>
-          <p className="text-sm text-zinc-500">{formatClinicDateTime(appointment.scheduledAt)}</p>
+          <p className="text-sm text-muted">{formatClinicDateTime(appointment.scheduledAt)}</p>
           <p className="text-sm">{appointment.reason}</p>
           <StatusButtons appointmentId={appointment.id} status={appointment.status} actor="OWNER" />
         </li>
