@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { idleState } from "@/server/shared/action-state";
 import { type FinalizeState, finalizePreConsultationAction } from "./actions";
+import { QuestionnaireForm } from "./questionnaire-form";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -10,7 +11,15 @@ const MAX_CHARS = 1500; // Mismo límite que el servidor (allí es el que manda;
 const MAX_TURNS = 24;
 const initialFinalizeState: FinalizeState = idleState;
 
-export function PreConsultationChat({ appointmentId, petName }: { appointmentId: string; petName: string }) {
+export function PreConsultationChat({
+  appointmentId,
+  petName,
+  privacyNotice,
+}: {
+  appointmentId: string;
+  petName: string;
+  privacyNotice: string;
+}) {
   // La conversación vive en el NAVEGADOR y se envía completa en cada turno: la API de Claude no
   // guarda estado entre llamadas. (Ver la nota sobre este trade-off en la explicación de la fase.)
   const [messages, setMessages] = useState<Message[]>([]);
@@ -23,6 +32,10 @@ export function PreConsultationChat({ appointmentId, petName }: { appointmentId:
     initialFinalizeState,
   );
   const listRef = useRef<HTMLOListElement>(null);
+  // RESPALDO: si la IA no está disponible (caída, cuota gratuita agotada), el dueño no se queda
+  // bloqueado: puede pasar al cuestionario, que no depende de ningún servicio externo.
+  const [useQuestionnaire, setUseQuestionnaire] = useState(false);
+  const [aiDown, setAiDown] = useState(false);
 
   const turnsLeft = MAX_TURNS - messages.length;
   const canFinalize = messages.some((m) => m.role === "assistant") && !streaming;
@@ -52,6 +65,7 @@ export function PreConsultationChat({ appointmentId, petName }: { appointmentId:
 
       if (!response.ok || !response.body) {
         const data = (await response.json().catch(() => null)) as { error?: string } | null;
+        if (response.status === 503) setAiDown(true); // IA no disponible → ofrecemos el cuestionario
         throw new Error(data?.error ?? "No pudimos contactar al asistente");
       }
 
@@ -78,14 +92,19 @@ export function PreConsultationChat({ appointmentId, petName }: { appointmentId:
     }
   }
 
+  if (useQuestionnaire) {
+    return (
+      <div className="flex flex-col gap-4">
+        {emergency && <EmergencyAlert />}
+        <QuestionnaireForm appointmentId={appointmentId} petName={petName} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      {emergency && (
-        <div role="alert" className="rounded-xl bg-red-700 px-4 py-3 text-sm text-white">
-          <p className="font-semibold">Esto puede ser una emergencia.</p>
-          <p>No esperes a la cita: llama a la clínica o acude a urgencias veterinarias ahora mismo.</p>
-        </div>
-      )}
+      <p className="text-xs text-muted">{privacyNotice}</p>
+      {emergency && <EmergencyAlert />}
 
       <ol ref={listRef} className="flex flex-col gap-3" aria-live="polite">
         {/* Saludo fijo de la UI: no es parte de la conversación que se envía a la IA. */}
@@ -153,6 +172,19 @@ export function PreConsultationChat({ appointmentId, petName }: { appointmentId:
         </button>
         {finalizeState.status === "error" && <p className="text-sm text-danger">{finalizeState.message}</p>}
       </form>
+
+      {/* Siempre disponible; destacado si la IA falló (en el chat o al generar el resumen). */}
+      <button
+        type="button"
+        onClick={() => setUseQuestionnaire(true)}
+        className={`self-start text-sm hover:underline ${
+          aiDown || finalizeState.status === "error" ? "font-medium text-brand" : "text-muted"
+        }`}
+      >
+        {aiDown || finalizeState.status === "error"
+          ? "Responder el cuestionario en su lugar →"
+          : "¿Prefieres un cuestionario en vez del chat?"}
+      </button>
     </div>
   );
 }
@@ -167,5 +199,14 @@ function Bubble({ role, children }: { role: Message["role"]; children: React.Rea
     >
       {children}
     </li>
+  );
+}
+
+function EmergencyAlert() {
+  return (
+    <div role="alert" className="rounded-xl bg-red-700 px-4 py-3 text-sm text-white">
+      <p className="font-semibold">Esto puede ser una emergencia.</p>
+      <p>No esperes a la cita: llama a la clínica o acude a urgencias veterinarias ahora mismo.</p>
+    </div>
   );
 }

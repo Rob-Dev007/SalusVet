@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { isAiConfigured } from "@/lib/anthropic";
 import { formatClinicDateTime } from "@/lib/clinic-time";
 import { requireRole } from "@/server/auth/session";
+import { getPreConsultationAI } from "@/server/pre-consultation/ai";
 import { getPreConsultationView } from "@/server/pre-consultation/pre-consultation.service";
 import { urgencyBadgeClass, urgencyLabels } from "../../labels";
 import { PreConsultationChat } from "./pre-consultation-chat";
@@ -74,13 +74,23 @@ async function PreConsultationContent({ params }: { params: Promise<{ id: string
     );
   }
 
+  const ai = getPreConsultationAI();
   return (
     <>
       {header}
       <div className="mt-6">
         {/* El servidor decide el modo: el navegador nunca ve la key ni el valor de AI_PROVIDER. */}
-        {isAiConfigured() ? (
-          <PreConsultationChat appointmentId={appointment.id} petName={appointment.pet.name} />
+        {ai ? (
+          <PreConsultationChat
+            appointmentId={appointment.id}
+            petName={appointment.pet.name}
+            // Transparencia: el dueño debe saber quién procesa lo que escribe.
+            privacyNotice={
+              ai.model.startsWith("gemini")
+                ? "Este asistente usa un servicio de IA de Google. No escribas datos personales tuyos (nombre, teléfono, dirección)."
+                : "Este asistente usa un servicio de IA externo. No escribas datos personales tuyos (nombre, teléfono, dirección)."
+            }
+          />
         ) : (
           <QuestionnaireForm appointmentId={appointment.id} petName={appointment.pet.name} />
         )}
