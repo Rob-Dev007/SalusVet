@@ -86,11 +86,13 @@ model User {
   deletedAt DateTime? // Soft delete: si tiene fecha, el usuario está "borrado" pero su historial sigue
 
   // ---- Campos de relación (NO son columnas en la BD; son "vistas" para el cliente de Prisma) ----
-  pets            Pet[]                     @relation("PetOwner") // 1:N · un dueño tiene muchas mascotas
-  vetAppointments Appointment[]             @relation("VetAppointments") // 1:N · un vet atiende muchas citas
-  statusChanges   AppointmentStatusChange[] @relation("StatusChangedBy") // 1:N · auditoría: cambios que hizo este usuario
-  sessions        Session[] // 1:N · un usuario puede tener sesiones abiertas en varios dispositivos
-  accounts        Account[] // 1:N · formas de iniciar sesión (contraseña, Google...)
+  pets                Pet[]                     @relation("PetOwner") // 1:N · un dueño tiene muchas mascotas
+  vetAppointments     Appointment[]             @relation("VetAppointments") // 1:N · un vet atiende muchas citas
+  statusChanges       AppointmentStatusChange[] @relation("StatusChangedBy") // 1:N · auditoría: cambios que hizo este usuario
+  sessions            Session[] // 1:N · un usuario puede tener sesiones abiertas en varios dispositivos
+  accounts            Account[] // 1:N · formas de iniciar sesión (contraseña, Google...)
+  redFlagsCreated     RedFlagKeyword[]          @relation("RedFlagCreatedBy") //     Auditoría: alertas que añadió este vet
+  redFlagsDeactivated RedFlagKeyword[]          @relation("RedFlagDeactivatedBy") // Auditoría: alertas que desactivó
 
   @@index([role]) // @@ = atributo a nivel de MODELO. Acelera "dame todos los VET"
 }
@@ -274,4 +276,28 @@ model PreConsultation {
   createdAt DateTime @default(now())
 
   @@index([urgency])
+}
+
+// SEÑALES DE ALARMA AÑADIDAS POR LA CLÍNICA.
+// Complementan la lista BASE que vive en el código (triage.ts), revisada y testeada. La lista base
+// no se puede tocar desde la interfaz; esta tabla solo puede AÑADIR señales. Resultado: desde la UI
+// el triaje solo puede volverse MÁS estricto, nunca menos (seguridad "monótona").
+//
+// Nunca se borran filas: una frase mal escrita se DESACTIVA, y queda quién y cuándo lo hizo.
+model RedFlagKeyword {
+  id     String @id @default(cuid())
+  label  String // Lo que verá el vet en el resumen: "Ingesta de paracetamol"
+  phrase String @unique // Frase NORMALIZADA (minúsculas, sin tildes): "paracetamol". UNIQUE evita duplicados
+
+  active Boolean @default(true)
+
+  createdById String?
+  createdBy   User?    @relation("RedFlagCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  deactivatedById String?
+  deactivatedBy   User?     @relation("RedFlagDeactivatedBy", fields: [deactivatedById], references: [id], onDelete: SetNull)
+  deactivatedAt   DateTime?
+
+  @@index([active]) // El triaje lee "todas las activas" en cada mensaje del chat
 }
