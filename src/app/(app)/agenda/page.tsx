@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { formatClinicDateTime, startOfClinicDay } from "@/lib/clinic-time";
 import { listAgendaForVet } from "@/server/appointments/appointment.service";
 import { requireRole } from "@/server/auth/session";
-import { statusBadgeClass, statusLabels } from "../appointments/labels";
+import { statusBadgeClass, statusLabels, urgencyBadgeClass, urgencyLabels } from "../appointments/labels";
 import { StatusButtons } from "../appointments/status-buttons";
 import { speciesLabels } from "../pets/labels";
 
@@ -47,6 +47,36 @@ async function VetAgenda() {
             <span className="text-muted"> · Dueño: {appointment.pet.owner.name}</span>
           </p>
           <p className="text-sm text-muted">{appointment.reason}</p>
+          {appointment.preConsultation ? (
+            // <details> nativo: desplegable accesible sin JavaScript. Abierto de entrada si es grave.
+            <details
+              open={appointment.preConsultation.urgency === "EMERGENCY" || appointment.preConsultation.urgency === "HIGH"}
+              className="rounded-lg bg-surface p-3 text-sm ring-1 ring-border"
+            >
+              <summary className="cursor-pointer font-medium">
+                Pre-consulta IA{" "}
+                <span
+                  className={`ml-1 rounded-full px-2 py-0.5 text-xs font-medium ${urgencyBadgeClass[appointment.preConsultation.urgency]}`}
+                >
+                  {urgencyLabels[appointment.preConsultation.urgency]}
+                </span>
+              </summary>
+              <p className="mt-2 font-medium">{appointment.preConsultation.chiefComplaint}</p>
+              <p className="mt-1 text-muted">{appointment.preConsultation.summary}</p>
+              {appointment.preConsultation.symptoms.length > 0 && (
+                <ul className="mt-2 flex flex-wrap gap-1">
+                  {appointment.preConsultation.symptoms.map((symptom) => (
+                    <li key={symptom} className="rounded-full bg-background px-2 py-0.5 text-xs ring-1 ring-border">
+                      {symptom}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-xs text-muted">Generado por IA a partir de lo que contó el dueño. No es un diagnóstico.</p>
+            </details>
+          ) : (
+            <p className="text-xs text-muted">Sin pre-consulta.</p>
+          )}
           <StatusButtons appointmentId={appointment.id} status={appointment.status} actor="VET" />
         </li>
       ))}
