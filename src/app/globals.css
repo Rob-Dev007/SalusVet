@@ -1,26 +1,73 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   TEMA DE SALUSVET
+   Paleta oficial (banner de la marca): azul marino #0B4A86 + celeste #D6E4F5 + blanco.
+
+   Los componentes NUNCA usan colores directos (bg-blue-900, text-zinc-500...).
+   Usan TOKENS SEMÁNTICOS que dicen PARA QUÉ sirve el color (bg-primary, text-muted...).
+   Cambiar de tema = cambiar el valor de los tokens; ningún componente se entera.
+   ============================================================================ */
+
+/* El tema se elige con el atributo data-theme en <html> ("light" | "dark"), que pone un
+   script antes del primer pintado (ver theme-script.tsx). Así "dark:" responde a la
+   elección del usuario y no solo a la preferencia del sistema operativo. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0f2236;
+  --surface: #f4f8fc; /*            Tarjetas, inputs */
+  --border: #d6e0eb;
+  --muted: #5a6b80; /*              Texto secundario (contraste 5.3:1 sobre blanco) */
+  --primary: #0b4a86; /*            Azul marino de la marca: botones principales */
+  --primary-hover: #083a6b;
+  --primary-foreground: #ffffff;
+  --brand: #0b4a86; /*              Logotipo, enlaces y acentos de texto */
+  --accent: #d6e4f5; /*             Celeste del logo: fondos suaves, insignias */
+  --accent-foreground: #0b4a86;
+  --danger: #c62828;
+  color-scheme: light; /*           Inputs nativos (calendario, selects) en claro */
 }
 
+[data-theme="dark"] {
+  --background: #06182b; /*         Marino muy profundo: oscuro, pero sigue siendo "de la marca" */
+  --foreground: #e7eef7;
+  --surface: #0d2540;
+  --border: #1d3a5c;
+  --muted: #9fb2c8;
+  --primary: #2c6fb8; /*            Más claro que en modo claro para destacar sobre fondo oscuro */
+  --primary-hover: #3a7fcb;
+  --primary-foreground: #ffffff;
+  --brand: #a9c8ee;
+  --accent: #12345a;
+  --accent-foreground: #cfe0f5;
+  --danger: #f08a8a;
+  color-scheme: dark;
+}
+
+/* Expone los tokens como utilidades de Tailwind: bg-primary, text-muted, border-border... */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-brand: var(--brand);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-danger: var(--danger);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-display-serif); /* Serif de la marca para logotipo y títulos */
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
