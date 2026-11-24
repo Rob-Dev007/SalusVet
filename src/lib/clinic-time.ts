@@ -7,9 +7,9 @@
 // Sin "server-only": lo usan tanto el servidor (validar) como los componentes (mostrar).
 import { TZDate } from "@date-fns/tz";
 
-// Zona IANA de la clínica. Un nombre como "America/Bogota" (no un offset fijo como "-05:00")
-// sigue funcionando aunque el país adopte horario de verano en el futuro.
-export const CLINIC_TIME_ZONE = "America/Bogota";
+// Zona IANA de la clínica (SalusVet está en Loja, Ecuador). Un nombre IANA (no un offset fijo
+// como "-05:00") sigue funcionando aunque el país adopte horario de verano en el futuro.
+export const CLINIC_TIME_ZONE = "America/Guayaquil";
 
 export const SLOT_MINUTES = 30; //   Turnos de 30 minutos: 08:00, 08:30, 09:00...
 export const OPENING_HOUR = 8; //    Primer turno 08:00
