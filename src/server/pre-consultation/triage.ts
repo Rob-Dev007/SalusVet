@@ -20,6 +20,10 @@ const URGENCY_RANK = { LOW: 0, MEDIUM: 1, HIGH: 2, EMERGENCY: 3 } as const satis
 // "normalizado" (minúsculas y sin tildes, ver normalize abajo), por eso no llevan acentos.
 // \b = límite de palabra: "uva" salta con "comió uvas" pero no dentro de otra palabra.
 // \w* = "cualquier terminación": convuls\w* cubre convulsión, convulsiona, convulsionando...
+//
+// Esta es la lista BASE: vive en el código porque es la red de seguridad mínima, pasa por revisión
+// de código y tests, y NO se puede modificar desde la interfaz. La clínica puede AÑADIR frases
+// (tabla RedFlagKeyword), nunca quitar estas.
 const RED_FLAGS: ReadonlyArray<{ label: string; pattern: RegExp }> = [
   { label: "Posible intoxicación (chocolate, xilitol, uvas, cebolla)", pattern: /\b(chocolate|xilitol|uvas?|pasas|cebolla)\b/ },
   { label: "Posible envenenamiento", pattern: /\b(veneno|envenen\w*|raticida|insecticida|anticongelante|intoxic\w*)\b/ },
@@ -34,17 +38,40 @@ const RED_FLAGS: ReadonlyArray<{ label: string; pattern: RegExp }> = [
   { label: "Parto complicado", pattern: /\b(parto|pariendo)\b.*\b(no sale|horas|atascad\w*)\b/ },
 ];
 
-// "Está TEMBLANDO y comió Chocolate" → "esta temblando y comio chocolate".
-// NFD separa "á" en "a" + acento; luego borramos los acentos (rango Unicode de diacríticos).
-function normalize(text: string) {
-  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+// Nombres de la lista base, para mostrarlos (solo lectura) en la página de alertas.
+export const BASE_RED_FLAG_LABELS = RED_FLAGS.map(({ label }) => label);
+
+// "Está TEMBLANDO y comió  Chocolate" → "esta temblando y comio chocolate".
+// NFD separa "á" en "a" + acento; luego borramos los acentos
+// y colapsamos espacios repetidos.
+export function normalize(text: string) {
+  return text
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "") // \p{M} = "marcas" Unicode: tildes, diéresis...
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
+
+// Frase añadida por la clínica (se guarda ya normalizada).
+export type ClinicRedFlag = { label: string; phrase: string };
+
+// ⚠️ NUNCA convertimos texto de un usuario en RegExp tal cual. Una regex escrita por alguien
+// (aunque sea un vet de confianza) puede romper el triaje con un error de sintaxis, o colgar el
+// servidor con un patrón catastrófico como (a+)+$ (ReDoS: el motor tarda muchísimo en responder).
+// Por eso el vet escribe PALABRAS y nosotros escapamos cualquier carácter especial: la frase se
+// busca literalmente, como palabra completa.
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // Devuelve las señales encontradas (sin duplicados) en los textos que escribió el DUEÑO.
 // Solo miramos lo que escribe el humano: el texto de la IA no es una fuente de hechos.
-export function detectRedFlags(ownerTexts: readonly string[]): string[] {
+export function detectRedFlags(ownerTexts: readonly string[], clinicFlags: readonly ClinicRedFlag[] = []): string[] {
   const text = normalize(ownerTexts.join("\n"));
-  return RED_FLAGS.filter(({ pattern }) => pattern.test(text)).map(({ label }) => label);
+  const base = RED_FLAGS.filter(({ pattern }) => pattern.test(text)).map(({ label }) => label);
+  const clinic = clinicFlags
+    .filter(({ phrase }) => new RegExp(`\\b${escapeRegExp(phrase)}\\b`).test(text))
+    .map(({ label }) => label);
+  return [...new Set([...base, ...clinic])]; // Set: sin etiquetas repetidas
 }
 
 // La decisión FINAL de urgencia la toma nuestro código, no el modelo.
