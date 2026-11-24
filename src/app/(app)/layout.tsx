@@ -13,8 +13,11 @@ const navByRole = {
     { href: "/pets", label: "Mascotas" },
     { href: "/appointments", label: "Citas" },
   ],
-  VET: [{ href: "/agenda", label: "Agenda" }],
-  ADMIN: [],
+  VET: [
+    { href: "/agenda", label: "Agenda" },
+    { href: "/red-flags", label: "Alertas" },
+  ],
+  ADMIN: [{ href: "/red-flags", label: "Alertas" }],
 } as const;
 
 // Layout de la zona privada. El encabezado es estático; lo que depende de la sesión va dentro

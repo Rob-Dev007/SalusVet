@@ -12,7 +12,7 @@ import { type NextRequest, NextResponse } from "next/server";
 // adentro" (por ejemplo, /sign-in → /pets): con una cookie inválida, requireUser() mandaría al
 // login, el proxy de vuelta a /pets, y así en bucle infinito. Un chequeo optimista solo puede
 // usarse para NEGAR acceso, jamás para CONCEDERLO.
-const protectedPrefixes = ["/pets", "/appointments", "/agenda"];
+const protectedPrefixes = ["/pets", "/appointments", "/agenda", "/red-flags"];
 
 export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
