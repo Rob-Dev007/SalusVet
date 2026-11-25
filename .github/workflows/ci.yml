@@ -1,0 +1,60 @@
+# INTEGRACIÓN CONTINUA: en cada PR y en cada push a main, GitHub comprueba lo mismo que tú en
+# local. Así las reglas de capas, los tipos y los tests del triaje no dependen de que alguien
+# se acuerde de correrlos: si algo se rompe, el PR muestra una ✗ antes de fusionar.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Un push nuevo al mismo PR cancela la ejecución anterior: solo importa el último commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Mínimo privilegio: este workflow solo necesita LEER el código.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Valores FALSOS a propósito. `prisma generate` (postinstall) y `next build` exigen que estas
+    # variables existan, pero ninguno se conecta a la BD ni usa el secreto de verdad. Así CI no
+    # necesita credenciales reales: no hay secretos que se puedan filtrar desde un PR.
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+      BETTER_AUTH_SECRET: ci-only-not-a-real-secret-0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24 # La misma versión que en desarrollo (y la que pide Vitest 5)
+          cache: npm
+
+      # npm ci (no npm install): instala EXACTAMENTE lo del package-lock y falla si no coincide.
+      - name: Install dependencies
+        run: npm ci
+
+      # Genera los tipos de las rutas (PageProps, LayoutProps...) que tsc necesita.
+      - name: Generate route types
+        run: npx next typegen
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint (layer boundaries)
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
