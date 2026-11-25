@@ -4,6 +4,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Wordmark } from "@/components/wordmark";
 import { homePathFor } from "@/lib/routes";
 import { getOptionalUser } from "@/server/auth/session";
+import { MainNav } from "./main-nav";
 import { SignOutButton } from "./sign-out-button";
 
 // Navegación por rol. Ocultar enlaces es COMODIDAD, no seguridad: cada página vuelve a verificar
@@ -26,11 +27,15 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <>
       <header className="border-b border-border">
-        <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-3">
-          <Suspense fallback={<Wordmark />}>
-            <UserNav />
-          </Suspense>
-        </div>
+        <Suspense
+          fallback={
+            <div className="mx-auto w-full max-w-3xl px-4 py-3">
+              <Wordmark />
+            </div>
+          }
+        >
+          <UserNav />
+        </Suspense>
       </header>
       {children}
     </>
@@ -40,26 +45,19 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
 async function UserNav() {
   const user = await getOptionalUser();
 
+  // El servidor decide QUÉ mostrar (enlaces del rol, nombre); MainNav (cliente) decide CÓMO
+  // (enlace activo, menú móvil). Los componentes de servidor se pasan como props ya renderizados.
   return (
-    <>
-      <nav className="flex items-center gap-4">
-        <Wordmark href={user ? homePathFor(user.role) : "/"} />
-        {user?.role &&
-          navByRole[user.role].map((item) => (
-            <Link key={item.href} href={item.href} className="text-sm text-muted hover:text-foreground">
-              {item.label}
-            </Link>
-          ))}
-      </nav>
-      <div className="flex items-center gap-4">
-        <ThemeToggle />
-        {user && (
-          <>
-            <span className="hidden text-sm text-muted sm:inline">{user.name}</span>
-            <SignOutButton />
-          </>
-        )}
-      </div>
-    </>
+    <MainNav
+      logo={<Wordmark href={user ? homePathFor(user.role) : "/"} />}
+      items={user ? navByRole[user.role] : []}
+      userName={user?.name}
+      actions={
+        <>
+          <ThemeToggle />
+          {user && <SignOutButton />}
+        </>
+      }
+    />
   );
 }
