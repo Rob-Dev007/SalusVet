@@ -27,6 +27,10 @@
   --accent: #d6e4f5; /*             Celeste del logo: fondos suaves, insignias */
   --accent-foreground: #0b4a86;
   --danger: #c62828;
+  --ring: rgb(11 74 134 / 0.35); /* Anillo de foco y sombras de hover */
+  /* Flecha del <select>. Va como imagen SVG, y una imagen no puede leer variables CSS: por eso
+     cada tema define la suya con el color de --muted ya escrito (%23 = "#"). */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%235a6b80' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
   color-scheme: light; /*           Inputs nativos (calendario, selects) en claro */
 }
 
@@ -43,6 +47,8 @@
   --accent: #12345a;
   --accent-foreground: #cfe0f5;
   --danger: #f08a8a;
+  --ring: rgb(169 200 238 / 0.35);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239fb2c8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
 
@@ -70,4 +76,164 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* ============================================================================
+   ESTILOS BASE DE CONTROLES
+   Van en @layer base: son el PUNTO DE PARTIDA de todos los formularios, y cualquier clase de
+   Tailwind en un componente los sobrescribe (las utilidades tienen más prioridad que base).
+   Una regla aquí arregla los 5 formularios de la app a la vez, sin tocar cada uno.
+   ============================================================================ */
+@layer base {
+  /* Tailwind v4 quitó el cursor de mano a los botones (preflight). Lo devolvemos para todo lo
+     que se puede pulsar, y "prohibido" cuando está deshabilitado. */
+  button:not(:disabled),
+  [role="button"],
+  a[href],
+  select:not(:disabled),
+  summary,
+  label:has(> input[type="radio"]),
+  label:has(> input[type="checkbox"]),
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
+  }
+
+  /* Botones y enlaces cambian de estado con una transición corta (no de golpe), y se "hunden"
+     un poco al pulsarlos: pequeño detalle que hace que la interfaz se sienta viva. */
+  button,
+  a {
+    transition:
+      color 150ms ease,
+      text-decoration-color 150ms ease, /* El subrayado de los enlaces aparece suave */
+      background-color 150ms ease,
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      transform 150ms ease,
+      translate 150ms ease, /* Tailwind v4: -translate-y-* usa la propiedad "translate", no "transform" */
+      opacity 150ms ease;
+  }
+  button:not(:disabled):active {
+    transform: translateY(1px) scale(0.98);
+  }
+
+  /* Foco visible SOLO con teclado (:focus-visible), no al hacer clic con el mouse. Accesibilidad:
+     quien navega con Tab necesita ver dónde está. */
+  :where(button, a, summary, select):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+
+  /* Textareas sin el "tirador" de la esquina: el usuario agrandaba el campo y rompía el diseño.
+     Cada textarea define su altura con rows={...}; si hace falta más texto, aparece el scroll. */
+  textarea {
+    resize: none;
+  }
+
+  /* MISMA ALTURA para inputs y selects: antes el <input type="date"> medía más que el <select> de
+     al lado y la fila quedaba descuadrada. */
+  select,
+  input:not([type="radio"], [type="checkbox"], [type="hidden"]) {
+    min-height: 2.5rem;
+  }
+
+  /* SELECT con la estética de la página: sin la flecha nativa del sistema, con la nuestra. */
+  select {
+    appearance: none;
+    background-image: var(--select-chevron);
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1.1rem;
+    padding-right: 2.25rem;
+  }
+}
+
+/* SUBRAYADO CON DESPLAZAMIENTO para enlaces de texto. En vez de text-decoration (que aparece de
+   golpe), la línea es una IMAGEN de fondo de 2px de alto cuyo ANCHO animamos:
+     · reposo: ancho 0, anclada a la DERECHA
+     · hover:  ancho 100%, anclada a la IZQUIERDA
+   Resultado: al entrar el mouse la línea crece de izquierda a derecha, y al salir se retira hacia
+   la derecha (sigue el sentido de lectura). Se usa como clase: className="link-underline". */
+@utility link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 100% 100%;
+  background-size: 0% 2px;
+  padding-bottom: 3px;
+  transition:
+    background-size 300ms ease,
+    color 150ms ease;
+
+  &:hover,
+  &:focus-visible {
+    background-position: 0% 100%;
+    background-size: 100% 2px;
+  }
+
+  /* Página actual: línea fija, en el azul de la marca. */
+  &[aria-current="page"] {
+    background-image: linear-gradient(var(--primary), var(--primary));
+    background-size: 100% 2px;
+  }
+}
+
+/* Accesibilidad: quien pidió al sistema "reducir movimiento" (mareos, distracción) no ve animaciones. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* MEJORA PROGRESIVA: "customizable select". Los navegadores que lo soportan (Chrome/Edge 135+)
+   permiten estilizar también la LISTA desplegable; los demás ignoran este bloque y se quedan con
+   el select de arriba, que ya combina con la página. Nadie pierde, algunos ganan. */
+@supports (appearance: base-select) {
+  @layer base {
+    select,
+    ::picker(select) {
+      appearance: base-select;
+    }
+    select::picker-icon {
+      display: none; /* Ya pintamos nuestra flecha con background-image */
+    }
+    ::picker(select) {
+      margin-top: 0.25rem;
+      padding: 0.25rem;
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      background: var(--background);
+      color: var(--foreground);
+      box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.35);
+    }
+    option {
+      padding: 0.45rem 0.6rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+    }
+    option:hover,
+    option:focus-visible {
+      background: var(--accent);
+      color: var(--accent-foreground);
+      outline: none;
+    }
+    option:checked {
+      font-weight: 600;
+      color: var(--brand);
+    }
+    option:disabled {
+      color: var(--muted);
+      cursor: default;
+    }
+    option::checkmark {
+      color: var(--brand);
+    }
+  }
 }
