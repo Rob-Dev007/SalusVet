@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Pre-consulta · SalusVet" };
 export default function PreConsultationPage({ params }: PageProps<"/appointments/[id]/pre-consultation">) {
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-10">
-      <Link href="/appointments" className="text-sm text-brand hover:underline">
+      <Link href="/appointments" className="link-underline text-sm text-brand">
         ← Mis citas
       </Link>
       <h1 className="mt-2 font-display text-3xl text-brand">Pre-consulta</h1>

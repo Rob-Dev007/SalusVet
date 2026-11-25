@@ -4,6 +4,7 @@ import { useActionState, useRef, useState } from "react";
 import { idleState } from "@/lib/action-state";
 import { type FinalizeState, finalizePreConsultationAction } from "./actions";
 import { QuestionnaireForm } from "./questionnaire-form";
+import { buttonClass } from "@/lib/ui";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -147,7 +148,7 @@ export function PreConsultationChat({
           <button
             type="submit"
             disabled={streaming || !input.trim() || turnsLeft < 2}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
+            className={buttonClass()}
           >
             {streaming ? "Respondiendo…" : "Enviar"}
           </button>
@@ -166,7 +167,7 @@ export function PreConsultationChat({
         <button
           type="submit"
           disabled={!canFinalize || finalizing}
-          className="rounded-lg border border-primary px-4 py-2 text-sm font-medium text-brand hover:bg-accent disabled:opacity-60"
+          className={buttonClass("secondary")}
         >
           {finalizing ? "Generando resumen…" : "Enviar al veterinario"}
         </button>
@@ -177,7 +178,7 @@ export function PreConsultationChat({
       <button
         type="button"
         onClick={() => setUseQuestionnaire(true)}
-        className={`self-start text-sm hover:underline ${
+        className={`link-underline self-start text-sm ${
           aiDown || finalizeState.status === "error" ? "font-medium text-brand" : "text-muted"
         }`}
       >

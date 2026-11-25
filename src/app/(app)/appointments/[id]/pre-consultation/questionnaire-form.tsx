@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { CHOICE_QUESTION_IDS, CHOICE_QUESTIONS, type ChoiceQuestionId } from "@/domain/questionnaire";
 import { idleState } from "@/lib/action-state";
 import { type QuestionnaireState, submitQuestionnaireAction } from "./actions";
+import { buttonClass } from "@/lib/ui";
 
 const initialState: QuestionnaireState = idleState;
 
@@ -103,7 +104,7 @@ export function QuestionnaireForm({ appointmentId, petName }: { appointmentId: s
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
+          className={buttonClass()}
         >
           {pending ? "Enviando…" : "Enviar al veterinario"}
         </button>

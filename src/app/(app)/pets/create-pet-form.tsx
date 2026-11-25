@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { idleState } from "@/lib/action-state";
 import { createPetAction, type CreatePetState } from "./actions";
 import { sexLabels, speciesLabels } from "./labels";
+import { buttonClass } from "@/lib/ui";
 
 const initialState: CreatePetState = idleState;
 
@@ -87,7 +88,7 @@ export function CreatePetForm() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
+          className={buttonClass()}
         >
           {pending ? "Guardando…" : "Registrar mascota"}
         </button>

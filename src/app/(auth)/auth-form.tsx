@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { homePathFor } from "@/lib/routes";
+import { buttonClass } from "@/lib/ui";
 
 // Traducimos los CÓDIGOS de error de Better Auth a mensajes nuestros.
 // Nunca mostramos error.message tal cual: no lo escribimos nosotros (ver la lección de error.tsx).
@@ -89,14 +90,14 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
+        className={buttonClass()}
       >
         {pending ? "Un momento…" : isSignUp ? "Crear cuenta" : "Iniciar sesión"}
       </button>
 
       <p className="text-center text-sm text-muted">
         {isSignUp ? "¿Ya tienes cuenta? " : "¿Primera vez aquí? "}
-        <Link href={isSignUp ? "/sign-in" : "/sign-up"} className="font-medium text-brand hover:underline">
+        <Link href={isSignUp ? "/sign-in" : "/sign-up"} className="link-underline font-medium text-brand">
           {isSignUp ? "Inicia sesión" : "Crea una cuenta"}
         </Link>
       </p>

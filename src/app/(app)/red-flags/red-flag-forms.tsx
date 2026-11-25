@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { buttonClass } from "@/lib/ui";
 import { idleState } from "@/lib/action-state";
 import {
   addRedFlagAction,
@@ -60,7 +61,7 @@ export function AddRedFlagForm() {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
+          className={buttonClass()}
         >
           {pending ? "Guardando…" : "Añadir alerta"}
         </button>
@@ -72,7 +73,7 @@ export function AddRedFlagForm() {
   );
 }
 
-const smallButton = "rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-surface disabled:opacity-60";
+const smallButton = buttonClass("secondary", "sm");
 
 // PASO 1 de la baja: pedirla con un motivo. <details> lo mantiene plegado hasta que hace falta,
 // sin JavaScript extra.
@@ -140,7 +141,7 @@ function FlagActionButton({
       <button
         type="submit"
         disabled={pending}
-        className={primary ? "rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60" : smallButton}
+        className={primary ? buttonClass("primary", "sm") : smallButton}
       >
         {pending ? "…" : label}
       </button>
