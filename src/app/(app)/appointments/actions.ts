@@ -8,7 +8,7 @@ import {
   ChangeAppointmentStatusSchema,
 } from "@/server/appointments/appointment.schemas";
 import { bookAppointment, changeAppointmentStatus } from "@/server/appointments/appointment.service";
-import type { ActionState } from "@/server/shared/action-state";
+import type { ActionState } from "@/lib/action-state";
 import { DomainError } from "@/server/shared/errors";
 
 export type BookAppointmentState = ActionState<{ id: string }>;

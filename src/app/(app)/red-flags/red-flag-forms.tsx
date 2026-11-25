@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { idleState } from "@/server/shared/action-state";
+import { idleState } from "@/lib/action-state";
 import {
   addRedFlagAction,
   approveDeactivationAction,

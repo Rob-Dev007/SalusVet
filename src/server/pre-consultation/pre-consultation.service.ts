@@ -17,8 +17,8 @@ import {
   type QuestionnaireAnswers,
   questionnaireFreeTexts,
   questionnaireUrgency,
-} from "./questionnaire";
-import { resolveUrgency } from "./triage";
+} from "@/domain/questionnaire";
+import { resolveUrgency } from "@/domain/triage";
 
 const AI_UNAVAILABLE_MESSAGE = "El asistente no está disponible en este momento. Puedes responder el cuestionario.";
 

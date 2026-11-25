@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { formatClinicDateTime, startOfClinicDay } from "@/lib/clinic-time";
 import { listAgendaForVet } from "@/server/appointments/appointment.service";
 import { requireRole } from "@/server/auth/session";
-import { QUESTIONNAIRE_VERSION } from "@/server/pre-consultation/questionnaire";
+import { QUESTIONNAIRE_VERSION } from "@/domain/questionnaire";
 import { statusBadgeClass, statusLabels, urgencyBadgeClass, urgencyLabels } from "../appointments/labels";
 import { StatusButtons } from "../appointments/status-buttons";
 import { speciesLabels } from "../pets/labels";

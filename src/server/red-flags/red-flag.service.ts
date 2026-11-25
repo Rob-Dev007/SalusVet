@@ -10,7 +10,7 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { CurrentUser } from "../auth/session";
-import { type ClinicRedFlag, detectRedFlags } from "../pre-consultation/triage";
+import { type ClinicRedFlag, detectRedFlags } from "@/domain/triage";
 import { DomainError } from "../shared/errors";
 import type { AddRedFlagInput } from "./red-flag.schemas";
 

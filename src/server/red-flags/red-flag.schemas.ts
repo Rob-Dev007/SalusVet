@@ -1,6 +1,6 @@
 // Formulario del vet para añadir una señal de alarma.
 import { z } from "zod";
-import { normalize } from "../pre-consultation/triage";
+import { normalize } from "@/domain/triage";
 
 export const AddRedFlagSchema = z.object({
   label: z

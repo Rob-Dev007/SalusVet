@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { CurrentUser } from "../auth/session";
 import { DomainError } from "../shared/errors";
 import type { BookAppointmentInput, ChangeAppointmentStatusInput } from "./appointment.schemas";
-import { type AppointmentActor, canTransition } from "./appointment.transitions";
+import { type AppointmentActor, canTransition } from "@/domain/appointment-transitions";
 
 const appointmentSelect = {
   id: true,

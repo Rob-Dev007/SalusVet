@@ -5,8 +5,8 @@ import { z } from "zod";
 import { requireRole } from "@/server/auth/session";
 import { TranscriptSchema } from "@/server/pre-consultation/pre-consultation.schemas";
 import { finalizePreConsultation, submitQuestionnaire } from "@/server/pre-consultation/pre-consultation.service";
-import { QuestionnaireSchema } from "@/server/pre-consultation/questionnaire";
-import type { ActionState } from "@/server/shared/action-state";
+import { QuestionnaireSchema } from "@/domain/questionnaire";
+import type { ActionState } from "@/lib/action-state";
 import { DomainError } from "@/server/shared/errors";
 
 export type FinalizeState = ActionState;

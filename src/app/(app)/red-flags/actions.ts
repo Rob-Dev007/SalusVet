@@ -12,7 +12,7 @@ import {
   lockRedFlag,
   requestRedFlagDeactivation,
 } from "@/server/red-flags/red-flag.service";
-import type { ActionState } from "@/server/shared/action-state";
+import type { ActionState } from "@/lib/action-state";
 import { DomainError } from "@/server/shared/errors";
 
 export type RedFlagState = ActionState;

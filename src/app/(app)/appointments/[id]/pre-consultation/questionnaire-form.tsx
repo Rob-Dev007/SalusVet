@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { CHOICE_QUESTION_IDS, CHOICE_QUESTIONS, type ChoiceQuestionId } from "@/server/pre-consultation/questionnaire";
-import { idleState } from "@/server/shared/action-state";
+import { CHOICE_QUESTION_IDS, CHOICE_QUESTIONS, type ChoiceQuestionId } from "@/domain/questionnaire";
+import { idleState } from "@/lib/action-state";
 import { type QuestionnaireState, submitQuestionnaireAction } from "./actions";
 
 const initialState: QuestionnaireState = idleState;

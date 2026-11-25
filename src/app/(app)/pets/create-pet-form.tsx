@@ -1,7 +1,7 @@
 "use client"; // Necesita estado (errores, pending) → Client Component
 
 import { useActionState, useState } from "react";
-import { idleState } from "@/server/shared/action-state";
+import { idleState } from "@/lib/action-state";
 import { createPetAction, type CreatePetState } from "./actions";
 import { sexLabels, speciesLabels } from "./labels";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { idleState } from "@/server/shared/action-state";
+import { idleState } from "@/lib/action-state";
 import { type FinalizeState, finalizePreConsultationAction } from "./actions";
 import { QuestionnaireForm } from "./questionnaire-form";
 

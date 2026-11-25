@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireUser } from "@/server/auth/session";
 import { CreatePetSchema } from "@/server/pets/pet.schemas";
 import { createPet } from "@/server/pets/pet.service";
-import type { ActionState } from "@/server/shared/action-state";
+import type { ActionState } from "@/lib/action-state";
 import { DomainError } from "@/server/shared/errors";
 
 export type CreatePetState = ActionState<{ id: string }>;

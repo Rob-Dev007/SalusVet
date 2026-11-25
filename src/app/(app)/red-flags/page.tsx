@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { formatClinicDateTime } from "@/lib/clinic-time";
 import { requireRole } from "@/server/auth/session";
-import { BASE_RED_FLAG_LABELS } from "@/server/pre-consultation/triage";
+import { BASE_RED_FLAG_LABELS } from "@/domain/triage";
 import { listRedFlagsForManagement } from "@/server/red-flags/red-flag.service";
 import {
   AddRedFlagForm,

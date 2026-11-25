@@ -2,8 +2,8 @@
 
 import { useActionState } from "react";
 import type { AppointmentStatus } from "@/generated/prisma/enums";
-import { type AppointmentActor, availableTransitions } from "@/server/appointments/appointment.transitions";
-import { idleState } from "@/server/shared/action-state";
+import { type AppointmentActor, availableTransitions } from "@/domain/appointment-transitions";
+import { idleState } from "@/lib/action-state";
 import { type ChangeStatusState, changeAppointmentStatusAction } from "./actions";
 import { transitionLabels } from "./labels";
 

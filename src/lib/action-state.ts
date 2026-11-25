@@ -1,6 +1,6 @@
 // Contrato entre una Server Action y el formulario que la usa (vía useActionState).
-// Este archivo NO lleva "server-only": el Client Component importa estos TIPOS.
-// (Los imports de tipo se borran al compilar, así que no arrastran código de servidor.)
+// Vive en lib/ (no en server/) porque lo importan AMBOS lados: la action (servidor) devuelve un
+// ActionState y el formulario (navegador) lo lee y arranca con idleState. Sin "server-only".
 
 export type FieldErrors = Partial<Record<string, string[]>>;
 
