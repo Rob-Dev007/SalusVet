@@ -26,10 +26,13 @@ export async function bookAppointmentAction(
   formData: FormData,
 ): Promise<BookAppointmentState> {
   const values = formValues(formData);
+  // El formulario envía fecha y turno por separado; el schema espera un solo "2026-11-27T16:00".
+  // Si falta alguno no lo armamos: así Zod responde "Elige fecha y hora" en vez de "inválida".
+  const scheduledAt = values.date && values.time ? `${values.date}T${values.time}` : undefined;
   try {
     const user = await requireRole("OWNER");
 
-    const parsed = BookAppointmentSchema.safeParse(values);
+    const parsed = BookAppointmentSchema.safeParse({ ...values, scheduledAt });
     if (!parsed.success) {
       return {
         status: "error",

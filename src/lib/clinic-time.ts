@@ -15,6 +15,16 @@ export const SLOT_MINUTES = 30; //   Turnos de 30 minutos: 08:00, 08:30, 09:00..
 export const OPENING_HOUR = 8; //    Primer turno 08:00
 export const CLOSING_HOUR = 18; //   Último turno 17:30
 
+// Lista de turnos ["08:00", "08:30", ..., "17:30"], DERIVADA de las constantes de arriba: si la
+// clínica cambia su horario, se cambia en un solo lugar y el formulario y la validación lo siguen.
+export const CLINIC_SLOTS: readonly string[] = Array.from(
+  { length: ((CLOSING_HOUR - OPENING_HOUR) * 60) / SLOT_MINUTES },
+  (_, i) => {
+    const minutes = OPENING_HOUR * 60 + i * SLOT_MINUTES;
+    return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  },
+);
+
 // "2026-11-24T10:30" (lo que envía <input type="datetime-local">, SIN zona) → instante UTC,
 // interpretando esa hora como hora de la clínica.
 export function parseClinicDateTime(value: string): Date | null {

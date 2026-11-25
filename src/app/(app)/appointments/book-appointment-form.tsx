@@ -1,8 +1,10 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { CLINIC_SLOTS } from "@/lib/clinic-time";
 import { idleState } from "@/lib/action-state";
 import { type BookAppointmentState, bookAppointmentAction } from "./actions";
+import { buttonClass } from "@/lib/ui";
 
 const initialState: BookAppointmentState = idleState;
 
@@ -53,17 +55,39 @@ export function BookAppointmentForm({ pets, vets }: { pets: Option[]; vets: Opti
         </select>
       </Field>
 
-      <Field label="Fecha y hora (hora de la clínica) *" htmlFor="scheduledAt" errors={errors?.scheduledAt}>
-        {/* step=1800 → el selector sugiere saltos de 30 min. Es solo ayuda: el servidor valida igual */}
-        <input
-          id="scheduledAt"
-          name="scheduledAt"
-          type="datetime-local"
-          step={1800}
-          defaultValue={values?.scheduledAt}
-          className={inputClass}
-        />
-      </Field>
+      {/* Fecha y turno por separado. Antes era un <input type="datetime-local" step={1800}>, pero
+          `step` es solo una SUGERENCIA: el navegador deja escribir 16:10 y el error llegaba recién al
+          enviar. Con una lista de turnos, la hora inválida directamente no se puede elegir.
+          (El servidor sigue validando igual: un formulario se puede falsificar.) */}
+      {/* Ocupa la fila completa y usa las MISMAS dos columnas que el form: la fecha queda bajo
+          "Mascota" y el turno bajo "Veterinario", alineados. */}
+      <fieldset className="flex flex-col gap-1 sm:col-span-2">
+        <legend className="mb-1 text-sm font-medium">Fecha y turno (hora de la clínica) *</legend>
+        <div className="grid grid-cols-2 gap-4">
+          <label htmlFor="date" className="sr-only">
+            Fecha
+          </label>
+          <input id="date" name="date" type="date" defaultValue={values?.date} className={inputClass} />
+          <label htmlFor="time" className="sr-only">
+            Turno
+          </label>
+          <select id="time" name="time" defaultValue={values?.time ?? ""} className={inputClass}>
+            <option value="" disabled>
+              Turno…
+            </option>
+            {CLINIC_SLOTS.map((slot) => (
+              <option key={slot} value={slot}>
+                {slot}
+              </option>
+            ))}
+          </select>
+        </div>
+        {errors?.scheduledAt?.map((message) => (
+          <p key={message} className="text-xs text-danger">
+            {message}
+          </p>
+        ))}
+      </fieldset>
 
       <div className="sm:col-span-2">
         <Field label="Motivo de la consulta *" htmlFor="reason" errors={errors?.reason}>
@@ -82,7 +106,7 @@ export function BookAppointmentForm({ pets, vets }: { pets: Option[]; vets: Opti
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
+          className={buttonClass()}
         >
           {pending ? "Agendando…" : "Solicitar cita"}
         </button>

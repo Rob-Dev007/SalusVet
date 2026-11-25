@@ -8,6 +8,25 @@ export const statusLabels: Record<AppointmentStatus, string> = {
   NO_SHOW: "No se presentó",
 };
 
+// Explicación en palabras del DUEÑO: la insignia dice "Pendiente", pero ¿pendiente de qué?
+// La frase responde la pregunta que se hace quien la lee: "¿y ahora qué pasa?".
+export const statusDescriptions: Record<AppointmentStatus, string> = {
+  PENDING: "Esperando que la clínica confirme tu cita.",
+  CONFIRMED: "La clínica confirmó tu cita. ¡Te esperamos!",
+  CANCELLED: "Esta cita fue cancelada.",
+  ATTENDED: "Tu mascota ya fue atendida en esta cita.",
+  NO_SHOW: "La cita se registró como no asistida.",
+};
+
+// Franja de color a la izquierda de cada tarjeta: el estado se reconoce de un vistazo.
+export const statusAccentClass: Record<AppointmentStatus, string> = {
+  PENDING: "border-l-amber-500",
+  CONFIRMED: "border-l-primary",
+  CANCELLED: "border-l-border",
+  ATTENDED: "border-l-emerald-500",
+  NO_SHOW: "border-l-red-500",
+};
+
 // Texto del BOTÓN que lleva a cada estado (la acción, no el estado).
 export const transitionLabels: Record<AppointmentStatus, string> = {
   PENDING: "Reabrir",

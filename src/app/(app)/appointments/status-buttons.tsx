@@ -2,12 +2,19 @@
 
 import { useActionState } from "react";
 import type { AppointmentStatus } from "@/generated/prisma/enums";
+import { buttonClass } from "@/lib/ui";
 import { type AppointmentActor, availableTransitions } from "@/domain/appointment-transitions";
 import { idleState } from "@/lib/action-state";
 import { type ChangeStatusState, changeAppointmentStatusAction } from "./actions";
 import { transitionLabels } from "./labels";
 
 const initialState: ChangeStatusState = idleState;
+
+const DESTRUCTIVE = new Set<AppointmentStatus>(["CANCELLED", "NO_SHOW"]);
+const confirmMessages: Partial<Record<AppointmentStatus, string>> = {
+  CANCELLED: "¿Seguro que quieres cancelar esta cita? Se liberará el turno.",
+  NO_SHOW: "¿Marcar que la mascota no se presentó a la cita?",
+};
 
 // Los botones salen de la MISMA tabla de transiciones que usa el servidor para autorizar.
 // Ocultarlos es comodidad; si alguien fuerza la petición, el servicio la rechaza igual.
@@ -35,13 +42,14 @@ export function StatusButtons({
           name="to"
           value={to}
           disabled={pending}
-          className={
-            to === "CANCELLED" || to === "NO_SHOW"
-              ? "rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-surface disabled:opacity-60"
-              : "rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-60"
-          }
+          onClick={(event) => {
+            // Cancelar o marcar "no se presentó" no se deshace con un clic: pedimos confirmación.
+            // (onClick y no onSubmit: así sabemos QUÉ botón se pulsó.)
+            if (DESTRUCTIVE.has(to) && !window.confirm(confirmMessages[to])) event.preventDefault();
+          }}
+          className={buttonClass(to === "CANCELLED" ? "danger" : to === "NO_SHOW" ? "secondary" : "primary", "sm")}
         >
-          {transitionLabels[to]}
+          {pending ? "…" : transitionLabels[to]}
         </button>
       ))}
       {state.status === "error" && (
