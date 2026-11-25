@@ -165,7 +165,13 @@ Ejemplo: vacunas de cada mascota.
 4. **Caso de uso:** el servicio va en `server/<feature>/<feature>.service.ts` con `import "server-only"`. Recibe el usuario de la sesión, autoriza y filtra por dueño.
 5. **Entrada:** la Server Action en `app/.../actions.ts` solo hace sesión → Zod → servicio → `ActionState`.
 6. **Interfaz:** la página (Server Component) y el formulario (Client Component con `useActionState`), usando `buttonClass()` y los tokens del tema.
-7. **Verificar:** `npx tsc --noEmit`, `npm run lint` y probar el flujo en el navegador.
+7. **Verificar:** `npx tsc --noEmit`, `npm run lint`, `npm test` y probar el flujo en el navegador.
+
+### Tests
+
+`npm test` corre Vitest sobre el código **puro**: `domain/` (triaje, cuestionario, máquina de estados), `lib/clinic-time.ts` y los formateadores de la UI. No necesitan BD ni servidor y la suite completa tarda menos de un segundo. Los tests viven junto al archivo que prueban (`triage.ts` → `triage.test.ts`).
+
+Si cambias una regla del triaje, primero agrega la frase al test. Un patrón roto no lanza errores: solo deja de detectar una emergencia.
 
 ---
 
@@ -173,7 +179,7 @@ Ejemplo: vacunas de cada mascota.
 
 | Tema | Riesgo | Plan |
 |---|---|---|
-| **Sin tests automáticos** | Un cambio en el triaje o en las transiciones puede romper algo sin que nadie lo note | Vitest para `domain/`, que no necesita BD |
+| **Tests solo del código puro** | Los servicios (autorización, cuatro ojos, turnos ocupados) se prueban a mano | Tests de integración con una BD de prueba |
 | **Sin rate limiting** en `/api/pre-consultation` | Abuso de la cuota de IA | Límite por usuario y por IP |
 | **Sin verificación de email** | Cuentas con correos falsos | Better Auth + Resend |
 | **Sin CI** | Las reglas solo se cumplen si alguien corre lint | GitHub Actions: `tsc`, lint y build en cada PR |
