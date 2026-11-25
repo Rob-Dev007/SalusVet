@@ -51,6 +51,7 @@ enum Species {
   BIRD
   RABBIT
   REPTILE
+  CATTLE // Vacuno: la clínica también atiende ganado (Loja tiene zona ganadera)
   OTHER
 }
 
@@ -169,7 +170,7 @@ model Pet {
   breed     String?
   sex       Sex       @default(UNKNOWN)
   birthDate DateTime? @db.Date // @db.Date = tipo nativo DATE de Postgres (sin hora). Edad aproximada si se desconoce
-  weightKg  Decimal?  @db.Decimal(5, 2) // Decimal, NO Float: evita errores de redondeo (999.99 kg máx.)
+  weightKg  Decimal?  @db.Decimal(6, 2) // Decimal, NO Float: evita errores de redondeo. (6,2) → hasta 9999.99 kg: cabe un toro
   notes     String?   @db.Text // @db.Text = texto sin límite (alergias, antecedentes...)
 
   // ---- LLAVE FORÁNEA ----

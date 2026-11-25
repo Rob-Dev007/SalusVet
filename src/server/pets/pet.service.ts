@@ -15,6 +15,7 @@ const petSummarySelect = {
   sex: true,
   birthDate: true,
   weightKg: true,
+  notes: true, // Alergias y antecedentes: el dueño debe poder ver lo que registró
   createdAt: true,
 } as const;
 

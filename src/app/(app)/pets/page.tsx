@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
+import { buttonClass } from "@/lib/ui";
 import { requireRole } from "@/server/auth/session";
 import { listPetsByOwner } from "@/server/pets/pet.service";
 import { CreatePetForm } from "./create-pet-form";
-import { sexLabels, speciesLabels } from "./labels";
+import { formatAge, sexLabels, speciesEmoji, speciesLabels } from "./labels";
 
 export const metadata: Metadata = { title: "Mis mascotas · SalusVet" };
 
@@ -20,7 +22,7 @@ export default function PetsPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-lg font-medium">Registradas</h2>
+        <h2 className="mb-3 text-lg font-medium">Mis mascotas registradas</h2>
         <Suspense fallback={<p className="text-sm text-muted">Cargando mascotas…</p>}>
           <PetList />
         </Suspense>
@@ -39,23 +41,65 @@ async function PetList() {
   }
 
   return (
-    <ul className="divide-y divide-border rounded-xl border border-border">
-      {pets.map((pet) => (
-        <li key={pet.id} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
-          <div>
-            <p className="font-medium">{pet.name}</p>
-            <p className="text-sm text-muted">
-              {speciesLabels[pet.species]}
-              {pet.breed && ` · ${pet.breed}`} · {sexLabels[pet.sex]}
-            </p>
-          </div>
-          <p className="text-sm text-muted">
-            {/* weightKg es Prisma.Decimal (no number): lo convertimos a texto para mostrarlo */}
-            {pet.weightKg && `${pet.weightKg.toString()} kg`}
-            {pet.birthDate && ` · nació ${pet.birthDate.toLocaleDateString("es", { timeZone: "UTC" })}`}
-          </p>
-        </li>
-      ))}
-    </ul>
+    <>
+      <p className="mb-4 text-sm text-muted">
+        {pets.length === 1 ? "1 mascota registrada" : `${pets.length} mascotas registradas`}
+      </p>
+      {/* Grilla: 1 columna en móvil, 2 desde tablet. Cada mascota es una tarjeta, no una fila
+          apretada: el dueño la reconoce por el ícono y el nombre antes de leer nada más. */}
+      <ul className="grid gap-4 sm:grid-cols-2">
+        {pets.map((pet) => (
+          <li key={pet.id} className="flex flex-col gap-4 rounded-xl border border-border bg-surface/40 p-5">
+            <div className="flex items-center gap-3">
+              <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full bg-accent text-2xl">
+                {speciesEmoji[pet.species]}
+              </span>
+              <div className="min-w-0">
+                <h3 className="truncate text-lg font-semibold">{pet.name}</h3>
+                <p className="text-sm text-muted">{speciesLabels[pet.species]}</p>
+              </div>
+            </div>
+
+            {/* Ficha en UNA columna: cada fila es "etiqueta ··· valor". Leer de arriba a abajo es
+                más rápido que saltar entre columnas, y en móvil no se aprietan los textos largos
+                (una raza como "Pastor alemán" o una edad como "4 años y 8 meses").
+                Si falta un dato lo decimos ("Sin registrar"): un hueco vacío hace dudar si es un error. */}
+            <dl className="divide-y divide-border rounded-lg bg-background text-sm ring-1 ring-border">
+              {[
+                { label: "Raza", value: pet.breed },
+                { label: "Sexo", value: sexLabels[pet.sex] },
+                {
+                  label: "Edad",
+                  value: pet.birthDate && formatAge(pet.birthDate),
+                  title: pet.birthDate ? `Nació el ${pet.birthDate.toLocaleDateString("es", { timeZone: "UTC" })}` : undefined,
+                },
+                // weightKg es Prisma.Decimal (no number): lo convertimos a texto para mostrarlo
+                { label: "Peso", value: pet.weightKg && `${pet.weightKg.toString()} kg` },
+              ].map((row) => (
+                <div key={row.label} className="flex items-baseline justify-between gap-4 px-3 py-2">
+                  <dt className="text-muted">{row.label}</dt>
+                  <dd className="text-right font-medium" title={row.title}>
+                    {row.value || <span className="font-normal text-muted">Sin registrar</span>}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+
+            {pet.notes && (
+              <p className="line-clamp-2 rounded-lg bg-background px-3 py-2 text-sm ring-1 ring-border" title={pet.notes}>
+                <span className="font-medium">Notas: </span>
+                {pet.notes}
+              </p>
+            )}
+
+            {/* Acción natural después de registrar: agendarle una cita. mt-auto la empuja al fondo
+                para que los botones queden alineados aunque las tarjetas tengan distinto alto. */}
+            <Link href="/appointments" className={`${buttonClass("secondary", "sm")} mt-auto self-start`}>
+              Agendar cita →
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

@@ -51,7 +51,10 @@ export const CreatePetSchema = z.object({
     z.coerce
       .number({ error: "Debe ser un número" }) //          "12.5" (string) → 12.5 (number)
       .positive({ error: "Debe ser mayor que 0" })
-      .max(999.99, { error: "Máximo 999.99 kg" }) //        Coincide con @db.Decimal(5, 2)
+      // Tope de NEGOCIO (2000 kg: el toro más pesado ronda 1500) por debajo del tope TÉCNICO de la
+      // columna (9999.99). Zod atrapa el error de tipeo ("5000" en vez de "500") con un mensaje claro;
+      // la BD solo garantiza que el número quepa.
+      .max(2000, { error: "Máximo 2000 kg" })
       .optional(),
   ),
 
