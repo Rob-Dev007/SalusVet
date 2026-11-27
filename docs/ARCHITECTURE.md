@@ -132,6 +132,15 @@ Si la IA falla o no está configurada, el dueño usa el cuestionario guiado. Cue
 
 El servicio de pre-consulta depende de la interfaz `PreConsultationAI` (`streamReply`, `summarize`), no de un proveedor. Gemini (gratis) y Claude (de pago) son **adaptadores** intercambiables, y se elige uno con `AI_PROVIDER` en `.env`. Cambiar de proveedor no toca el servicio, y ESLint impide importar un SDK de IA fuera de `server/pre-consultation/ai/`.
 
+### Límite de uso de la IA
+
+Cada mensaje del chat y cada resumen cuestan cuota del proveedor. `enforceAiRateLimit` (`server/rate-limit/`) los cuenta **antes** de llamar a la IA: 30 cada 10 minutos y 100 al día por dueño, y 120 cada 10 minutos por IP.
+
+- **Contador en Postgres, no en memoria:** en serverless cada instancia tiene su propia memoria.
+- **Un solo `INSERT … ON CONFLICT DO UPDATE … RETURNING`:** Postgres suma y devuelve el total en una operación atómica, así que diez peticiones simultáneas reciben diez números distintos.
+- **Las reglas son puras** (`domain/rate-limit.ts`) y tienen tests.
+- **Llegar al límite no bloquea a nadie:** la respuesta es `429` con `Retry-After`, el triaje y su aviso siguen funcionando, y el dueño puede pasar al cuestionario gratuito.
+
 ### Fechas: UTC en la BD, hora de la clínica en la interfaz
 
 La BD guarda instantes en UTC. Todo lo que se muestra o se valida («turno entre 08:00 y 17:30») usa `America/Guayaquil` (`lib/clinic-time.ts`), sin importar dónde corra el servidor ni el navegador del usuario.
@@ -180,7 +189,7 @@ Si cambias una regla del triaje, primero agrega la frase al test. Un patrón rot
 | Tema | Riesgo | Plan |
 |---|---|---|
 | **Tests solo del código puro** | Los servicios (autorización, cuatro ojos, turnos ocupados) se prueban a mano | Tests de integración con una BD de prueba |
-| **Sin rate limiting** en `/api/pre-consultation` | Abuso de la cuota de IA | Límite por usuario y por IP |
+| Rate limiting con ventana fija | En el borde entre dos ventanas pasan hasta el doble de llamadas | Ventana deslizante, si alguna vez hace falta más precisión |
 | **Sin verificación de email** | Cuentas con correos falsos | Better Auth + Resend |
 | **Sin CI** | Las reglas solo se cumplen si alguien corre lint | GitHub Actions: `tsc`, lint y build en cada PR |
 | La conversación de la pre-consulta viaja desde el navegador | El cliente reenvía todo el historial en cada mensaje | Guardar los mensajes en el servidor |
