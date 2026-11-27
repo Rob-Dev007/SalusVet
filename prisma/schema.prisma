@@ -321,3 +321,16 @@ model RedFlagKeyword {
 
   @@index([active]) // El triaje lee "todas las activas" en cada mensaje del chat
 }
+
+// CONTADORES DE RATE LIMITING (cuántas llamadas a la IA hizo cada dueño o IP en una ventana).
+// ¿Por qué en Postgres y no en memoria? En serverless cada instancia tiene SU memoria: con un
+// contador en RAM, diez instancias darían diez veces el límite. La BD es la única memoria común.
+// Una fila por (clave, inicio de ventana): "ai:user:abc" de 10:00 a 10:10 → count = 7.
+model RateLimitBucket {
+  key         String // "ai:user:<id>", "ai:user-day:<id>", "ai:ip:<ip>"
+  windowStart DateTime @db.Timestamptz(3)
+  count       Int      @default(0)
+
+  @@id([key, windowStart]) // La clave compuesta es lo que permite el ON CONFLICT atómico
+  @@index([windowStart]) //   Para borrar rápido las ventanas viejas
+}
