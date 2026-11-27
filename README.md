@@ -1,3 +1,11 @@
+# SalusVet
+
+Aplicación de una clínica veterinaria en Loja, Ecuador: mascotas, citas, pre-consulta con triaje y alertas clínicas.
+
+**Arquitectura:** cómo está organizado el código, por qué, y cómo agregar una funcionalidad → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

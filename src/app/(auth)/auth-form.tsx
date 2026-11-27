@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { homePathFor } from "@/lib/routes";
+import { buttonClass } from "@/lib/ui";
 
 // Traducimos los CÓDIGOS de error de Better Auth a mensajes nuestros.
 // Nunca mostramos error.message tal cual: no lo escribimos nosotros (ver la lección de error.tsx).
@@ -17,7 +19,7 @@ const errorMessages: Record<string, string> = {
 const fallbackError = "No pudimos completar la operación. Inténtalo de nuevo.";
 
 const inputClass =
-  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20 dark:border-zinc-700 dark:bg-zinc-900";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
 
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const router = useRouter();
@@ -37,7 +39,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     // El cliente llama a /api/auth/*. La validación que importa ocurre en el servidor;
     // aquí solo recogemos el resultado. Fíjate: no enviamos "role". Y si lo enviáramos,
     // el servidor lo ignoraría (input: false en lib/auth.ts).
-    const { error } = isSignUp
+    const { data, error } = isSignUp
       ? await authClient.signUp.email({ email, password, name: String(form.get("name")) })
       : await authClient.signIn.email({ email, password });
 
@@ -48,7 +50,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     }
 
     // Éxito: la cookie de sesión ya está guardada (HttpOnly, el JS no puede leerla).
-    router.push("/pets");
+    // Elegir a dónde ir según el rol es solo COMODIDAD: cada página vuelve a verificarlo.
+    router.push(homePathFor(data.user.role));
     router.refresh(); // Re-renderiza los Server Components, que ahora ven la sesión
   }
 
@@ -77,24 +80,24 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           autoComplete={isSignUp ? "new-password" : "current-password"}
           className={inputClass}
         />
-        {isSignUp && <span className="text-xs font-normal text-zinc-500">Mínimo 10 caracteres</span>}
+        {isSignUp && <span className="text-xs font-normal text-muted">Mínimo 10 caracteres</span>}
       </label>
 
-      <p aria-live="polite" className="min-h-5 text-sm text-red-600">
+      <p aria-live="polite" className="min-h-5 text-sm text-danger">
         {error}
       </p>
 
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-60"
+        className={buttonClass()}
       >
         {pending ? "Un momento…" : isSignUp ? "Crear cuenta" : "Iniciar sesión"}
       </button>
 
-      <p className="text-center text-sm text-zinc-500">
+      <p className="text-center text-sm text-muted">
         {isSignUp ? "¿Ya tienes cuenta? " : "¿Primera vez aquí? "}
-        <Link href={isSignUp ? "/sign-in" : "/sign-up"} className="font-medium text-teal-700 hover:underline dark:text-teal-400">
+        <Link href={isSignUp ? "/sign-in" : "/sign-up"} className="link-underline font-medium text-brand">
           {isSignUp ? "Inicia sesión" : "Crea una cuenta"}
         </Link>
       </p>

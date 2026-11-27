@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import type { Role } from "@/generated/prisma/enums";
 import { auth } from "@/lib/auth";
+import { homePathFor } from "@/lib/routes";
 
 export type CurrentUser = { id: string; name: string; role: Role };
 
@@ -33,4 +34,12 @@ export async function getOptionalUser(): Promise<CurrentUser | null> {
 
   const { id, name, role } = session.user;
   return { id, name, role };
+}
+
+// Para páginas exclusivas de un rol. Un VET que entra a /appointments (de dueños) no ve un
+// error: lo llevamos a SU inicio. La autorización fina (¿esta cita es tuya?) sigue en el servicio.
+export async function requireRole(...roles: Role[]): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (!roles.includes(user.role)) redirect(homePathFor(user.role));
+  return user;
 }

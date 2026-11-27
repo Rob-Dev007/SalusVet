@@ -7,7 +7,10 @@ export type DomainErrorCode =
   | "UNAUTHENTICATED" // No hay sesión
   | "FORBIDDEN" //       Hay sesión, pero no tiene permiso
   | "NOT_FOUND"
-  | "LIMIT_EXCEEDED";
+  | "LIMIT_EXCEEDED"
+  | "CONFLICT" //           Choca con el estado actual (horario ya tomado, la cita cambió mientras tanto)
+  | "INVALID_TRANSITION" // La máquina de estados no permite ese cambio
+  | "UNAVAILABLE"; //       Un servicio externo (la IA) no está disponible o declinó responder
 
 export class DomainError extends Error {
   constructor(
