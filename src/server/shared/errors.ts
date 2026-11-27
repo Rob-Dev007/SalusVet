@@ -21,3 +21,15 @@ export class DomainError extends Error {
     this.name = "DomainError";
   }
 }
+
+// Límite de uso alcanzado. Lleva CUÁNDO reintentar: la ruta HTTP lo convierte en el encabezado
+// estándar Retry-After (lo entienden navegadores, clientes HTTP y proxies).
+export class RateLimitError extends DomainError {
+  constructor(
+    message: string,
+    public readonly retryAfterSeconds: number,
+  ) {
+    super("LIMIT_EXCEEDED", message);
+    this.name = "RateLimitError";
+  }
+}
