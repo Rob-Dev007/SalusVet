@@ -21,7 +21,21 @@ import nextTs from "eslint-config-next/typescript";
 // Piezas reutilizables de las reglas. Cada grupo lista el alias (@/lib/prisma) Y su forma relativa
 // (**/lib/prisma): si no, `import { prisma } from "../../lib/prisma"` se saltaría la frontera.
 const DB = {
-  group: ["@/lib/prisma", "@/generated/prisma/client", "@/generated/prisma/client/*", "**/lib/prisma", "**/generated/prisma/client"],
+  group: [
+    // El cliente de la app (alias y forma relativa).
+    "@/lib/prisma",
+    "@/generated/prisma/client",
+    "@/generated/prisma/client/*",
+    "**/lib/prisma",
+    "**/generated/prisma/client",
+    // Los paquetes de npm. Llevan "/" delante a propósito: estos patrones funcionan como
+    // .gitignore, y un "prisma" sin ancla coincidiría con CUALQUIER parte de la ruta, incluido
+    // "@/generated/prisma/enums", que sí está permitido.
+    "/prisma",
+    "/prisma/*",
+    "@prisma/*",
+    "/pg",
+  ],
   message:
     "La BD solo se toca desde src/server/** (servicios). La UI llama a un servicio o a una Server Action. " +
     "(Los enums sí se pueden importar: @/generated/prisma/enums)",
