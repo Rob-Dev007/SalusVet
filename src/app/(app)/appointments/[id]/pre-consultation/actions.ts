@@ -1,6 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { requireRole } from "@/server/auth/session";
 import { TranscriptSchema } from "@/server/pre-consultation/pre-consultation.schemas";
@@ -8,6 +9,7 @@ import { finalizePreConsultation, submitQuestionnaire } from "@/server/pre-consu
 import { QuestionnaireSchema } from "@/domain/questionnaire";
 import type { ActionState } from "@/lib/action-state";
 import { DomainError } from "@/server/shared/errors";
+import { clientIp } from "@/lib/client-ip";
 
 export type FinalizeState = ActionState;
 
@@ -41,7 +43,12 @@ export async function finalizePreConsultationAction(
     });
     if (!parsed.success) return { status: "error", message: "La conversación no es válida" };
 
-    await finalizePreConsultation(user.id, parsed.data.appointmentId, parsed.data.transcript);
+    await finalizePreConsultation(
+      user.id,
+      parsed.data.appointmentId,
+      parsed.data.transcript,
+      clientIp(await headers()), // En una Server Action no hay `request`: los encabezados vienen de headers()
+    );
     refresh(); // La página vuelve a renderizar y muestra el resumen guardado
     return { status: "success", message: "Enviado al veterinario", data: undefined };
   } catch (error) {

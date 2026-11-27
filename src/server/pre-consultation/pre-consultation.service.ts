@@ -6,6 +6,7 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { enforceAiRateLimit } from "../rate-limit/rate-limit.service";
 import { detectAllRedFlags } from "../red-flags/red-flag.service";
 import { DomainError } from "../shared/errors";
 import { AiUnavailableError, getPreConsultationAI, type PreConsultationAI } from "./ai";
@@ -94,10 +95,14 @@ export async function streamPreConsultationReply(
   ownerId: string,
   appointmentId: string,
   transcript: Transcript,
+  ip: string | null, // Para el límite por IP (ver lib/client-ip.ts)
   signal: AbortSignal, // Si el dueño cierra la pestaña, cortamos la llamada
 ) {
   const appointment = await loadOwnedAppointment(ownerId, appointmentId);
   const ai = requireAi();
+  // El límite va DESPUÉS de autorizar (no gastamos cupo en peticiones que igual se rechazarían)
+  // y ANTES de llamar al proveedor (lo que cuesta dinero).
+  await enforceAiRateLimit({ userId: ownerId, ip });
 
   // TRIAJE DETERMINISTA, ANTES de llamar a la IA. Si hay alarma, nuestro código añade una
   // instrucción de operador: la IA no "decide" la emergencia, solo la comunica.
@@ -152,9 +157,15 @@ export async function streamPreConsultationReply(
 // ---------------------------------------------------------------------------------------------
 // CASO DE USO 2: el dueño termina el chat → resumen ESTRUCTURADO, triaje final y guardado.
 // ---------------------------------------------------------------------------------------------
-export async function finalizePreConsultation(ownerId: string, appointmentId: string, transcript: Transcript) {
+export async function finalizePreConsultation(
+  ownerId: string,
+  appointmentId: string,
+  transcript: Transcript,
+  ip: string | null,
+) {
   const appointment = await loadOwnedAppointment(ownerId, appointmentId);
   const ai = requireAi();
+  await enforceAiRateLimit({ userId: ownerId, ip }); // El resumen también llama a la IA: también cuenta
 
   // La conversación va como UN texto con etiquetas, no como turnos: queremos que el modelo la
   // ANALICE desde fuera, no que la continúe.

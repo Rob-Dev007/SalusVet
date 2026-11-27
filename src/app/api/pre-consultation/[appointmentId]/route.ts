@@ -8,12 +8,14 @@ import { getOptionalUser } from "@/server/auth/session";
 import { ChatRequestSchema } from "@/server/pre-consultation/pre-consultation.schemas";
 import { streamPreConsultationReply } from "@/server/pre-consultation/pre-consultation.service";
 import { detectAllRedFlags } from "@/server/red-flags/red-flag.service";
-import { DomainError } from "@/server/shared/errors";
+import { DomainError, RateLimitError } from "@/server/shared/errors";
+import { clientIp } from "@/lib/client-ip";
 
 const STATUS_BY_CODE: Partial<Record<DomainError["code"], number>> = {
   NOT_FOUND: 404,
   CONFLICT: 409,
   INVALID_TRANSITION: 409,
+  LIMIT_EXCEEDED: 429, // Too Many Requests
   UNAVAILABLE: 503,
 };
 
@@ -44,6 +46,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/pre-consult
       user.id,
       appointmentId,
       parsed.data.messages,
+      clientIp(request.headers),
       request.signal, // Se aborta si el cliente se desconecta
     );
     return new Response(body, {
@@ -58,7 +61,14 @@ export async function POST(request: Request, ctx: RouteContext<"/api/pre-consult
     if (error instanceof DomainError) {
       return Response.json(
         { error: error.message },
-        { status: STATUS_BY_CODE[error.code] ?? 400, headers: redFlagsHeader },
+        {
+          status: STATUS_BY_CODE[error.code] ?? 400,
+          headers: {
+            ...redFlagsHeader,
+            // Estándar HTTP: cuántos SEGUNDOS esperar antes de reintentar.
+            ...(error instanceof RateLimitError && { "Retry-After": String(error.retryAfterSeconds) }),
+          },
+        },
       );
     }
     throw error; // Error técnico: Next responde 500 sin filtrar detalles

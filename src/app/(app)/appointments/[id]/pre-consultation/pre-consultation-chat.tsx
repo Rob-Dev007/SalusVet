@@ -66,7 +66,9 @@ export function PreConsultationChat({
 
       if (!response.ok || !response.body) {
         const data = (await response.json().catch(() => null)) as { error?: string } | null;
-        if (response.status === 503) setAiDown(true); // IA no disponible → ofrecemos el cuestionario
+        // IA no disponible (503) o límite alcanzado (429) → ofrecemos el cuestionario, que es
+        // gratis y no tiene límite. Llegar al tope nunca deja al dueño sin pre-consulta.
+        if (response.status === 503 || response.status === 429) setAiDown(true);
         throw new Error(data?.error ?? "No pudimos contactar al asistente");
       }
 
